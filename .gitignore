@@ -1,0 +1,16 @@
+﻿node_modules/
+.next/
+.env*.local
+.env.*
+.DS_Store
+*.pem
+debug.json
+coverage/
+dist/
+build/
+
+# Vercel
+.vercel
+
+# Testing
+.jest/
