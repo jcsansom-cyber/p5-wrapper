@@ -290,7 +290,7 @@ export default function Home() {
         const text = data.text ?? '';
         const htmlTemplateCandidate = extractHtmlTemplate(text);
         const code = htmlTemplateCandidate
-          ? extractFencedBlock(text, ['p5js', 'javascript', 'js'])
+          ? extractFencedBlock(text, ['p5js', 'javascript', 'js']) || extractSketchFromImportedText(text)
           : extractCodeBlock(text);
 
         if (code) {
