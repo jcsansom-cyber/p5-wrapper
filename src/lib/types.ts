@@ -91,6 +91,7 @@ Rules:
 - For live webcam face tracking, prefer ml5.faceMesh with createCapture(VIDEO), hide the video element, and call detectStart(video, callback).
 - Do not use the old ml5.faceApi API.
 - If the sketch needs the camera, make it interactive and explain that it requires HTTPS or localhost.
+- If the sketch needs extra script tags, iframe permissions, or other wrapper changes, return a full HTML document in a fenced \`html\` code block as well as any sketch code.
 - Prefer clean, beginner-friendly code with light comments.
 - When modifying existing sketches, return the full updated sketch instead of a diff.
 - Do not tell the user to install packages locally; everything runs in the browser.
@@ -148,6 +149,22 @@ export function extractCodeBlock(text: string): string {
   }
 
   return text.trim();
+}
+
+export function extractHtmlTemplate(text: string): string {
+  const fencedMatch = text.match(/```(?:\s*html)?\s*\n([\s\S]*?)```/i);
+  const candidate = fencedMatch?.[1]?.trim() ?? text.trim();
+
+  if (!candidate) return '';
+
+  const normalized = candidate.toLowerCase();
+  const looksLikeHtml =
+    normalized.includes('<!doctype html') ||
+    normalized.includes('<html') ||
+    normalized.includes('<head') ||
+    normalized.includes('<body');
+
+  return looksLikeHtml ? candidate : '';
 }
 
 export function buildSystemPrompt(options?: { includeMl5?: boolean; sketchContext?: string }): string {

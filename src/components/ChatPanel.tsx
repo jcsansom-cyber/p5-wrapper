@@ -6,6 +6,7 @@ import type { ChatMessage, Provider } from '../lib/types';
 interface ChatPanelProps {
   messages: ChatMessage[];
   onSendMessage: (content: string) => void;
+  onUseStarterPrompt: (content: string) => void;
   isLoading: boolean;
   currentProvider: Provider;
   hasApiKey: boolean;
@@ -70,6 +71,7 @@ function renderMessageContent(content: string) {
 export default function ChatPanel({
   messages,
   onSendMessage,
+  onUseStarterPrompt,
   isLoading,
   currentProvider,
   hasApiKey,
@@ -117,6 +119,8 @@ export default function ChatPanel({
     'Data visualizations',
     'ml5.js object detection',
   ];
+  const webcamStarterPrompt =
+    'Create a Mona Lisa sketch where the eyes follow the viewer using the webcam. Use ml5.faceMesh with createCapture(VIDEO), keep the camera mirrored if helpful, and include any HTML or wrapper changes needed for webcam permissions.';
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -158,6 +162,17 @@ export default function ChatPanel({
                   {msg}
                 </p>
               ))}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'center', marginTop: 16 }}>
+              <button
+                type="button"
+                className="btn btn-sm btn-primary"
+                onClick={() => onUseStarterPrompt(webcamStarterPrompt)}
+                disabled={!hasApiKey || isLoading}
+                title="Generate a webcam face-tracking starter"
+              >
+                Mona Lisa webcam starter
+              </button>
             </div>
           </div>
         )}
@@ -241,4 +256,3 @@ export default function ChatPanel({
     </div>
   );
 }
-

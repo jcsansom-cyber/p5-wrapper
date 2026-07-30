@@ -17,6 +17,7 @@ import {
   type SavedSketch,
   type UploadedAsset,
   buildAssetContext,
+  extractHtmlTemplate,
   normalizeAnthropicModel,
 } from '../lib/types';
 import { extractCodeBlock } from '../lib/types';
@@ -46,7 +47,10 @@ const MIN_CHAT_WIDTH = 280;
 const MIN_CODE_WIDTH = 320;
 const DEFAULT_CHAT_WIDTH = 360;
 const DEFAULT_CODE_WIDTH = 520;
+const WORKSPACE_DRAWER_WIDTH = 560;
 const RESIZE_GRIP_WIDTH = 8;
+const MONA_LISA_STARTER_PROMPT =
+  'Create a Mona Lisa sketch where the eyes follow the viewer through the webcam. Use ml5.faceMesh with createCapture(VIDEO), hide the video element, and include any HTML wrapper or permissions changes needed for webcam access. If helpful, return a full HTML document in a fenced html code block.';
 
 function composeSystemPrompt(basePrompt: string, includeMl5: boolean, sketchContext: string, assetContext: string): string {
   const trimmedBase = basePrompt.trim() || DEFAULT_CONFIG.systemPrompt;
@@ -57,7 +61,8 @@ function composeSystemPrompt(basePrompt: string, includeMl5: boolean, sketchCont
       '\n\nThe user may want ml5.js features. If so, include the ml5.js CDN script and write code that works in the browser.' +
       '\nFor live webcam face tracking, use ml5.faceMesh with createCapture(VIDEO), hide the video element, and call detectStart(video, callback).' +
       '\nDo not use the old ml5.faceApi API.' +
-      '\nIf the sketch needs the camera, remind the user it requires HTTPS or localhost.';
+      '\nIf the sketch needs the camera, remind the user it requires HTTPS or localhost.' +
+      '\nIf the sketch needs extra script tags, iframe permissions, or other wrapper changes, you may return a full HTML document in a fenced html code block so the app can apply it.';
   }
 
   if (sketchContext.trim()) {
@@ -108,6 +113,7 @@ export default function Home() {
   const [codeWidth, setCodeWidth] = useState(DEFAULT_CODE_WIDTH);
   const [htmlTemplate, setHtmlTemplate] = useState(DEFAULT_HTML_TEMPLATE);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [workspaceTab, setWorkspaceTab] = useState<'files' | 'html'>('files');
   const [hydrated, setHydrated] = useState(false);
   const dragStateRef = useRef<{ type: 'chat' | 'code' | null; startX: number; startWidth: number }>({
     type: null,
@@ -283,10 +289,17 @@ export default function Home() {
         const data = (await response.json()) as { text?: string };
         const text = data.text ?? '';
         const code = extractCodeBlock(text);
+        const htmlTemplateCandidate = extractHtmlTemplate(text);
 
         if (code) {
           setCurrentCode(code);
           setActiveSketchId(null);
+          setSessionCount(prev => prev + 1);
+        }
+
+        if (htmlTemplateCandidate) {
+          setHtmlTemplate(htmlTemplateCandidate);
+          setDrawerOpen(true);
           setSessionCount(prev => prev + 1);
         }
 
@@ -335,6 +348,13 @@ export default function Home() {
     setMessages([]);
     setPreviewError(null);
   }, []);
+
+  const handleUseStarterPrompt = useCallback(() => {
+    setIncludeMl5(true);
+    setDrawerOpen(true);
+    setWorkspaceTab('html');
+    void sendMessage(MONA_LISA_STARTER_PROMPT);
+  }, [sendMessage]);
 
   const loadSampleSketch = useCallback(() => {
     setCurrentCode(DEFAULT_SKETCH);
@@ -519,6 +539,25 @@ export default function Home() {
         <button type="button" className="btn btn-sm btn-success" onClick={loadSampleSketch} title="Load sample sketch">
           Sample Sketch
         </button>
+        <button
+          type="button"
+          className="btn btn-sm btn-secondary"
+          onClick={handleUseStarterPrompt}
+          title="Generate a webcam face-tracking starter"
+        >
+          Mona Lisa Starter
+        </button>
+        <button
+          type="button"
+          className="btn btn-sm btn-secondary"
+          onClick={() => {
+            setDrawerOpen(true);
+            setWorkspaceTab('html');
+          }}
+          title="Open the HTML editor"
+        >
+          Edit HTML
+        </button>
 
         <div style={{ flex: 1 }} />
 
@@ -562,6 +601,7 @@ export default function Home() {
             <ChatPanel
               messages={messages}
               onSendMessage={sendMessage}
+              onUseStarterPrompt={handleUseStarterPrompt}
               isLoading={isLoading}
               currentProvider={activeProvider}
               hasApiKey={hasApiKey}
@@ -639,7 +679,9 @@ export default function Home() {
           isOpen={drawerOpen}
           assets={assets}
           htmlTemplate={htmlTemplate}
+          activeTab={workspaceTab}
           onToggleOpen={() => setDrawerOpen(prev => !prev)}
+          onTabChange={setWorkspaceTab}
           onAddFiles={handleAddFiles}
           onRemoveAsset={handleRemoveAsset}
           onClearAssets={handleClearAssets}

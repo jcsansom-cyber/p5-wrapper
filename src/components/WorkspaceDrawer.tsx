@@ -1,13 +1,15 @@
 'use client';
 
-import React, { useRef, useState } from 'react';
+import React, { useRef } from 'react';
 import type { UploadedAsset } from '../lib/types';
 
 interface WorkspaceDrawerProps {
   isOpen: boolean;
   assets: UploadedAsset[];
   htmlTemplate: string;
+  activeTab: 'files' | 'html';
   onToggleOpen: () => void;
+  onTabChange: (tab: 'files' | 'html') => void;
   onAddFiles: (files: FileList | File[]) => void;
   onRemoveAsset: (id: string) => void;
   onClearAssets: () => void;
@@ -24,14 +26,16 @@ export default function WorkspaceDrawer({
   isOpen,
   assets,
   htmlTemplate,
+  activeTab,
   onToggleOpen,
+  onTabChange,
   onAddFiles,
   onRemoveAsset,
   onClearAssets,
   onHtmlTemplateChange,
 }: WorkspaceDrawerProps) {
-  const [tab, setTab] = useState<'files' | 'html'>('files');
   const inputRef = useRef<HTMLInputElement>(null);
+  const drawerWidth = 560;
 
   return (
     <>
@@ -41,7 +45,7 @@ export default function WorkspaceDrawer({
         title={isOpen ? 'Close workspace drawer' : 'Open workspace drawer'}
         style={{
           position: 'absolute',
-          right: isOpen ? 380 : 0,
+          right: isOpen ? drawerWidth : 0,
           top: '50%',
           transform: 'translateY(-50%)',
           zIndex: 40,
@@ -61,9 +65,9 @@ export default function WorkspaceDrawer({
       <div
         style={{
           position: 'absolute',
-          right: isOpen ? 0 : -380,
+          right: isOpen ? 0 : -drawerWidth,
           top: 0,
-          width: 380,
+          width: drawerWidth,
           height: '100%',
           background: 'var(--bg-secondary)',
           borderLeft: '1px solid var(--border-color)',
@@ -77,23 +81,23 @@ export default function WorkspaceDrawer({
         <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)' }}>
           <button
             type="button"
-            className={`btn btn-sm ${tab === 'files' ? 'btn-primary' : 'btn-secondary'}`}
+            className={`btn btn-sm ${activeTab === 'files' ? 'btn-primary' : 'btn-secondary'}`}
             style={{ borderRadius: 0, flex: 1 }}
-            onClick={() => setTab('files')}
+            onClick={() => onTabChange('files')}
           >
             Files
           </button>
           <button
             type="button"
-            className={`btn btn-sm ${tab === 'html' ? 'btn-primary' : 'btn-secondary'}`}
+            className={`btn btn-sm ${activeTab === 'html' ? 'btn-primary' : 'btn-secondary'}`}
             style={{ borderRadius: 0, flex: 1 }}
-            onClick={() => setTab('html')}
+            onClick={() => onTabChange('html')}
           >
             HTML
           </button>
         </div>
 
-        {tab === 'files' ? (
+        {activeTab === 'files' ? (
           <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 10, minHeight: 0, overflow: 'hidden' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <strong style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Files</strong>
@@ -178,10 +182,10 @@ export default function WorkspaceDrawer({
             </div>
           </div>
         ) : (
-          <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 10, minHeight: 0, overflow: 'hidden' }}>
+          <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 12, minHeight: 0, overflow: 'hidden', flex: 1 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-              <strong style={{ fontSize: 13, color: 'var(--text-secondary)' }}>HTML</strong>
-              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Edit the exported wrapper file here.</span>
+              <strong style={{ fontSize: 14, color: 'var(--text-secondary)' }}>HTML</strong>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Edit the exported wrapper file here. WebGL, webcam, and script-tag tweaks belong here.</span>
             </div>
             <textarea
               className="textarea"
@@ -192,9 +196,12 @@ export default function WorkspaceDrawer({
                 flex: 1,
                 minHeight: 0,
                 resize: 'none',
+                padding: 16,
                 fontFamily: "'JetBrains Mono', 'Fira Code', Consolas, monospace",
-                fontSize: 11,
-                lineHeight: 1.5,
+                fontSize: 12,
+                lineHeight: 1.6,
+                border: '1px solid var(--border-color)',
+                borderRadius: 10,
               }}
             />
           </div>
@@ -203,4 +210,3 @@ export default function WorkspaceDrawer({
     </>
   );
 }
-
