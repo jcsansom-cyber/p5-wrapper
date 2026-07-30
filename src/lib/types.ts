@@ -1,29 +1,239 @@
-﻿export interface Message {
-  role: 'user' | 'assistant' | 'system';
+export type Provider = 'anthropic' | 'openai';
+
+export interface AppConfig {
+  anthropicKey: string;
+  openaiKey: string;
+  anthropicModel: string;
+  openaiModel: string;
+  systemPrompt: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
   content: string;
-  timestamp?: number;
+  timestamp: number;
+}
+
+export interface ProviderMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface GenerateRequestBody {
+  provider: Provider;
+  apiKey: string;
+  model: string;
+  messages: ProviderMessage[];
+  systemPrompt: string;
+  maxTokens?: number;
+}
+
+export interface UploadedAsset {
+  id: string;
+  name: string;
+  type: string;
+  size: number;
+  dataUrl: string;
+  addedAt: number;
+}
+
+export interface SavedSketch {
+  id: string;
+  name: string;
+  code: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export const DEFAULT_HTML_TEMPLATE = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>p5.js Sketch</title>
+  <script src="https://cdn.jsdelivr.net/npm/p5@1.9.4/lib/p5.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/p5@1.9.4/lib/addons/p5.sound.min.js"></script>
+{{ML5_SCRIPT}}
+  <style>
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #0f0f14;
+    }
+    canvas {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+{{ASSET_SCRIPT_TAG}}
+  <script id="p5-source">
+{{SKETCH_SOURCE}}
+  </script>
+{{RUNTIME_SCRIPT}}
+</body>
+</html>`;
+
+export const DEFAULT_SYSTEM_PROMPT = `You are a helpful p5.js assistant.
+
+You create complete, runnable sketches for the browser.
+
+Rules:
+- Return complete code in a single markdown code block labeled \`javascript\` or \`p5js\`.
+- Include the full sketch, including \`setup()\` and \`draw()\` when appropriate.
+- Write code that runs directly in the browser with p5.js.
+- If the user asks for ml5.js features, include the ml5.js CDN script and use it correctly.
+- Prefer clean, beginner-friendly code with light comments.
+- When modifying existing sketches, return the full updated sketch instead of a diff.
+- Do not tell the user to install packages locally; everything runs in the browser.
+- If the request is ambiguous, make the smallest useful assumption and keep the sketch interactive.
+`;
+
+export const DEFAULT_CONFIG: AppConfig = {
+  anthropicKey: '',
+  openaiKey: '',
+  anthropicModel: 'claude-haiku-4-5',
+  openaiModel: 'gpt-4.1-nano-2025-04-14',
+  systemPrompt: DEFAULT_SYSTEM_PROMPT,
+};
+
+export const ANTHROPIC_MODEL_OPTIONS = [
+  { value: 'claude-haiku-4-5', label: 'Claude Haiku 4.5' },
+] as const;
+
+export const OPENAI_MODEL_OPTIONS = [
+  { value: 'gpt-4.1-nano-2025-04-14', label: 'GPT-4.1 nano' },
+  { value: 'gpt-4.1-mini-2025-04-14', label: 'GPT-4.1 mini' },
+] as const;
+
+export function normalizeAnthropicModel(model: string | undefined | null): string {
+  const trimmed = (model ?? '').trim();
+  return trimmed || DEFAULT_CONFIG.anthropicModel;
+}
+
+export const DEFAULT_SKETCH = `function setup() {
+  createCanvas(400, 400);
+}
+
+function draw() {
+  background(18, 18, 24);
+
+  noStroke();
+  fill(92, 141, 249);
+  circle(mouseX, mouseY, 48);
+
+  fill(232);
+  textAlign(CENTER, CENTER);
+  textSize(16);
+  text('Move your mouse!', width / 2, 32);
+}`;
+
+export function extractCodeBlock(text: string): string {
+  const fencedMatch = text.match(/```(?:\s*(?:p5js|javascript|js))?\s*\n([\s\S]*?)```/i);
+  if (fencedMatch?.[1]) {
+    return fencedMatch[1].trim();
+  }
+
+  const anyFenceMatch = text.match(/```\s*\n([\s\S]*?)```/);
+  if (anyFenceMatch?.[1]) {
+    return anyFenceMatch[1].trim();
+  }
+
+  return text.trim();
 }
 
 export function buildSystemPrompt(options?: { includeMl5?: boolean; sketchContext?: string }): string {
   const ml5Note = options?.includeMl5
-    ? '\\n\\nYou MUST support ml5.js integration. The user may want to use machine learning features like object detection, pose estimation, image classification, skin tone detection, sound classification, or body part tracking. Import ml5 via CDN in the sketch: <script src="https://unpkg.com/ml5@latest/dist/ml5.min.js"></script>'
+    ? `\n- Include ml5.js when the sketch needs machine learning features.\n- Use this CDN script when needed: <script src="https://unpkg.com/ml5@latest/dist/ml5.min.js"></script>`
     : '';
 
-  const contextNote = options?.sketchContext
-    ? \\n\\nThe user is currently working on this sketch:\\n\\\p5.js\\n\\n\\\`
+  const sketchContext = options?.sketchContext?.trim()
+    ? `\n\nCurrent sketch context:\n\`\`\`javascript\n${options.sketchContext.trim()}\n\`\`\``
     : '';
 
-  return You are a helpful p5.js assistant. You help users create interactive creative coding sketches using p5.js.
+  return `${DEFAULT_SYSTEM_PROMPT.trim()}${ml5Note}${sketchContext}`;
+}
 
-Rules:
-- Always respond with complete, runnable p5.js code in markdown code blocks labeled "p5js" or "javascript".
-- Include all necessary setup() and draw() functions.
-- Use the latest p5.js API. Import via CDN: <script src="https://cdn.jsdelivr.net/npm/p5@1.9.4/lib/p5.min.js"></script>
-- Keep code clean, well-commented, and beginner-friendly.
-- If the user asks for ml5.js features, include the ml5.js CDN import.
-- Never ask users to install anything — everything runs in the browser.
-- Suggest improvements and alternative approaches when helpful.
-- When modifying existing sketches, show the complete updated code, not just diffs.
+export function buildAssetContext(assets: UploadedAsset[]): string {
+  if (!assets.length) return '';
 
-Current conversation:;
+  const lines = assets
+    .map(asset => `- ${asset.name} (${asset.type || 'unknown type'})`)
+    .join('\n');
+
+  return `\n\nUploaded assets available to the sketch:\n${lines}\n\nUse p5AssetURL("filename") to load an uploaded asset by name. For example: loadImage(p5AssetURL("image.png")) or loadSound(p5AssetURL("music.mp3")).`;
+}
+
+export function buildAssetRegistryScript(assets: UploadedAsset[]): string {
+  const registry = Object.fromEntries(
+    assets.map(asset => [
+      asset.name,
+      {
+        id: asset.id,
+        name: asset.name,
+        type: asset.type,
+        size: asset.size,
+        dataUrl: asset.dataUrl,
+      },
+    ])
+  );
+
+  return `
+    window.__P5_ASSETS__ = ${JSON.stringify(registry)};
+    window.p5Assets = window.__P5_ASSETS__;
+    window.p5AssetURL = function(name) {
+      return window.__P5_ASSETS__ && window.__P5_ASSETS__[name] ? window.__P5_ASSETS__[name].dataUrl : '';
+    };
+    window.p5AssetNames = function() {
+      return Object.keys(window.__P5_ASSETS__ || {});
+    };
+  `;
+}
+
+export function buildHtmlFromTemplate(
+  template: string,
+  options: { sketchSource: string; assets: UploadedAsset[]; includeMl5?: boolean }
+): string {
+  const assetScript = buildAssetRegistryScript(options.assets);
+  const runtimeScript = `<script>
+    const sketch = document.getElementById('p5-source')?.textContent || '';
+    const errorBox = document.createElement('pre');
+    errorBox.id = 'p5-error';
+    errorBox.style.cssText = 'display:none;position:fixed;left:12px;right:12px;bottom:12px;padding:12px;border-radius:8px;background:rgba(248,113,113,0.12);color:#fda4af;font-family:monospace;font-size:12px;white-space:pre-wrap;border:1px solid rgba(248,113,113,0.24);z-index:9999;';
+    document.body.appendChild(errorBox);
+
+    function reportError(message) {
+      errorBox.textContent = message;
+      errorBox.style.display = 'block';
+      window.parent?.postMessage({ type: 'p5-error', message }, '*');
+    }
+
+    window.addEventListener('error', function(event) {
+      reportError(event.message || 'Unknown preview error');
+    });
+
+    window.addEventListener('unhandledrejection', function(event) {
+      const reason = event.reason && event.reason.message ? event.reason.message : String(event.reason || 'Unknown promise rejection');
+      reportError(reason);
+    });
+
+    try {
+      window.eval(sketch);
+      window.parent?.postMessage({ type: 'p5-ready' }, '*');
+    } catch (error) {
+      reportError(error && error.message ? error.message : String(error));
+    }
+  </script>`;
+  return template
+    .replaceAll(
+      '{{ML5_SCRIPT}}',
+      options.includeMl5 === false ? '' : '<script src="https://unpkg.com/ml5@latest/dist/ml5.min.js"></script>'
+    )
+    .replaceAll('{{ASSET_SCRIPT_TAG}}', `<script>${assetScript.trim()}</script>`)
+    .replaceAll('{{ASSET_SCRIPT}}', assetScript.trim())
+    .replaceAll('{{SKETCH_SOURCE}}', options.sketchSource)
+    .replaceAll('{{RUNTIME_SCRIPT}}', runtimeScript);
 }

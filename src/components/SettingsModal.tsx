@@ -1,35 +1,108 @@
-﻿'use client';
+'use client';
 
 import React from 'react';
+import { ANTHROPIC_MODEL_OPTIONS, OPENAI_MODEL_OPTIONS, type AppConfig, type SavedSketch } from '../lib/types';
 
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  config: {
-    anthropicKey: string;
-    openaiKey: string;
-    systemPrompt: string;
-  };
-  onConfigChange: (config: {
-    anthropicKey: string;
-    openaiKey: string;
-    systemPrompt: string;
-  }) => void;
+  config: AppConfig;
+  onConfigChange: (config: AppConfig) => void;
+  savedSketches: SavedSketch[];
+  onLoadSketch: (sketch: SavedSketch) => void;
+  onDeleteSketch: (id: string) => void;
+  onImportSketchFiles: (files: FileList | File[]) => void;
 }
 
-export default function SettingsModal({ isOpen, onClose, config, onConfigChange }: SettingsModalProps) {
+export default function SettingsModal({
+  isOpen,
+  onClose,
+  config,
+  onConfigChange,
+  savedSketches,
+  onLoadSketch,
+  onDeleteSketch,
+  onImportSketchFiles,
+}: SettingsModalProps) {
   if (!isOpen) return null;
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal fade-in" onClick={e => e.stopPropagation()}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+      <div
+        className="modal fade-in"
+        onClick={e => e.stopPropagation()}
+        style={{
+          maxHeight: '90vh',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexShrink: 0 }}>
           <h2 style={{ fontSize: 18, fontWeight: 600 }}>⚙️ Settings</h2>
-          <button onClick={onClose} className="btn btn-sm btn-secondary" title="Close">✕</button>
+          <button type="button" onClick={onClose} className="btn btn-sm btn-secondary" title="Close">
+            ✕
+          </button>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {/* Anthropic API Key */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, overflowY: 'auto', paddingRight: 6, minHeight: 0, flex: 1 }}>
+          <div>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: '#9898a8', marginBottom: 6 }}>
+              Saved Sketches
+            </label>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 11, color: '#6b6b7d' }}>Load, delete, or import a downloaded sketch.</span>
+              <label className="btn btn-sm btn-secondary" style={{ cursor: 'pointer' }}>
+                Import Sketch
+                <input
+                  type="file"
+                  accept=".js,.txt,.html,.htm,text/plain,text/html,application/json"
+                  style={{ display: 'none' }}
+                  onChange={e => {
+                    if (e.target.files?.length) {
+                      onImportSketchFiles(e.target.files);
+                      e.target.value = '';
+                    }
+                  }}
+                />
+              </label>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 180, overflowY: 'auto', paddingRight: 4 }}>
+              {savedSketches.length > 0 ? (
+                savedSketches.map(sketch => (
+                  <div
+                    key={sketch.id}
+                    style={{
+                      border: '1px solid var(--border-color)',
+                      borderRadius: 8,
+                      padding: 10,
+                      background: 'rgba(255,255,255,0.02)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      justifyContent: 'space-between',
+                    }}
+                  >
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, wordBreak: 'break-word' }}>{sketch.name}</div>
+                      <div style={{ fontSize: 10, color: '#6b6b7d' }}>Updated {new Date(sketch.updatedAt).toLocaleString()}</div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                      <button type="button" className="btn btn-sm btn-primary" onClick={() => onLoadSketch(sketch)}>
+                        Load
+                      </button>
+                      <button type="button" className="btn btn-sm btn-secondary" onClick={() => onDeleteSketch(sketch.id)}>
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div style={{ fontSize: 12, color: '#6b6b7d' }}>No saved sketches yet.</div>
+              )}
+            </div>
+          </div>
+
           <div>
             <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: '#9898a8', marginBottom: 6 }}>
               Claude API Key (Anthropic)
@@ -41,12 +114,37 @@ export default function SettingsModal({ isOpen, onClose, config, onConfigChange 
               value={config.anthropicKey}
               onChange={e => onConfigChange({ ...config, anthropicKey: e.target.value })}
             />
+            <p style={{ fontSize: 11, color: '#6b6b7d', marginTop: 4 }}>Stored only in your browser session.</p>
+          </div>
+
+          <div>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: '#9898a8', marginBottom: 6 }}>
+              Claude Model ID
+            </label>
+            <input
+              type="text"
+              className="input"
+              value={config.anthropicModel}
+              onChange={e => onConfigChange({ ...config, anthropicModel: e.target.value })}
+              placeholder="claude-sonnet-4-20250514"
+            />
+            <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+              {ANTHROPIC_MODEL_OPTIONS.map(option => (
+                <button
+                  key={option.value}
+                  type="button"
+                  className="btn btn-sm btn-secondary"
+                  onClick={() => onConfigChange({ ...config, anthropicModel: option.value })}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
             <p style={{ fontSize: 11, color: '#6b6b7d', marginTop: 4 }}>
-              Get your key from console.anthropic.com
+              Claude Haiku 4.5 is the default low-cost Anthropic option we support, and you can still paste a custom Claude model ID if needed.
             </p>
           </div>
 
-          {/* OpenAI API Key */}
           <div>
             <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: '#9898a8', marginBottom: 6 }}>
               GPT API Key (OpenAI)
@@ -58,39 +156,69 @@ export default function SettingsModal({ isOpen, onClose, config, onConfigChange 
               value={config.openaiKey}
               onChange={e => onConfigChange({ ...config, openaiKey: e.target.value })}
             />
-            <p style={{ fontSize: 11, color: '#6b6b7d', marginTop: 4 }}>
-              Get your key from platform.openai.com
-            </p>
+            <p style={{ fontSize: 11, color: '#6b6b7d', marginTop: 4 }}>Stored only in your browser session.</p>
           </div>
 
-          {/* System Prompt */}
           <div>
             <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: '#9898a8', marginBottom: 6 }}>
-              Custom System Prompt
+              GPT Model ID
+            </label>
+            <input
+              type="text"
+              className="input"
+              value={config.openaiModel}
+              onChange={e => onConfigChange({ ...config, openaiModel: e.target.value })}
+              placeholder="gpt-5-nano-2025-08-07"
+            />
+            <p style={{ fontSize: 11, color: '#6b6b7d', marginTop: 4 }}>
+              GPT-4.1 nano is the lowest-cost OpenAI option we support here.
+            </p>
+            <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+              {OPENAI_MODEL_OPTIONS.map(option => (
+                <button
+                  key={option.value}
+                  type="button"
+                  className="btn btn-sm btn-secondary"
+                  onClick={() => onConfigChange({ ...config, openaiModel: option.value })}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: '#9898a8', marginBottom: 6 }}>
+              System Prompt
             </label>
             <textarea
               className="textarea"
-              rows={4}
-              placeholder="Override the default system prompt..."
+              rows={6}
+              placeholder="Customize the assistant's instructions..."
               value={config.systemPrompt}
               onChange={e => onConfigChange({ ...config, systemPrompt: e.target.value })}
             />
           </div>
 
-          {/* Privacy Notice */}
-          <div style={{ padding: 12, background: 'rgba(74, 222, 128, 0.08)', border: '1px solid rgba(74, 222, 128, 0.2)', borderRadius: 6 }}>
+          <div
+            style={{
+              padding: 12,
+              background: 'rgba(74, 222, 128, 0.08)',
+              border: '1px solid rgba(74, 222, 128, 0.2)',
+              borderRadius: 6,
+            }}
+          >
             <p style={{ fontSize: 12, color: '#4ade80', fontWeight: 500 }}>🔒 Privacy First</p>
             <p style={{ fontSize: 11, color: '#9898a8', lineHeight: 1.5 }}>
-              Your API keys are stored only in your browser&apos;s memory and localStorage. 
-              No data is ever sent to our servers. All API requests go directly through this app&apos;s 
-              serverless function — we never log or store your prompts or generated code.
+              API keys stay in browser session storage. Generated sketches and chat history can be saved locally in your
+              browser, but nothing is written to the backend.
             </p>
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: 8, marginTop: 20, justifyContent: 'flex-end' }}>
-          <button onClick={onClose} className="btn btn-secondary">
-            Cancel
+        <div style={{ display: 'flex', gap: 8, marginTop: 16, justifyContent: 'flex-end', flexShrink: 0 }}>
+          <button type="button" onClick={onClose} className="btn btn-secondary">
+            Close
           </button>
         </div>
       </div>

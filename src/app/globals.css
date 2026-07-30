@@ -278,6 +278,10 @@ body {
   padding: 24px;
   max-width: 480px;
   width: 90%;
+  max-height: 90vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
   box-shadow: var(--shadow);
 }
 

@@ -1,113 +1,140 @@
-﻿// Extract code block from markdown response text
-export function extractCode(text: string): string {
-  // Try to find p5js or javascript code block
-  const p5Regex = /`(?:p5js|javascript)\s*([\s\S]*?)`/;
-  const jsMatch = text.match(p5Regex);
-  if (jsMatch) return jsMatch[1].trim();
-
-  // Try to find any code block
-  const codeRegex = /`([\s\S]*?)`/;
-  const codeMatch = text.match(codeRegex);
-  if (codeMatch) return codeMatch[1].trim();
-
-  // Return trimmed response if no code block found
-  return text.trim();
-}
-
-// Anthropic messages format
-interface AnthropicMessage {
-  role: 'user' | 'assistant';
-  content: string;
-}
+import type { ProviderMessage } from './types';
 
 interface AnthropicResponse {
-  content: Array<{ text: string }>;
+  content?: Array<{ type?: string; text?: string }>;
   usage?: { input_tokens?: number; output_tokens?: number };
 }
 
-// OpenAI response format
-interface OpenAIResponse {
-  choices: Array<{ message?: { content?: string } }>;
+interface OpenAIChatResponse {
+  choices?: Array<{ message?: { content?: string } }>;
   usage?: { prompt_tokens?: number; completion_tokens?: number };
+}
+
+const DEFAULT_ANTHROPIC_FALLBACK_MODEL = 'claude-haiku-4-5';
+
+async function readErrorMessage(response: Response): Promise<string> {
+  const rawText = await response.text().catch(() => '');
+  if (!rawText) {
+    return `HTTP ${response.status} ${response.statusText}`;
+  }
+
+  try {
+    const parsed = JSON.parse(rawText) as {
+      error?: { message?: string; type?: string };
+      message?: string;
+      type?: string;
+    };
+    return parsed.error?.message || parsed.message || rawText;
+  } catch {
+    return rawText;
+  }
+}
+
+function isAnthropicModelNotFound(errorText: string, model: string): boolean {
+  const lower = errorText.toLowerCase();
+  return lower.includes('not_found_error') && lower.includes(model.toLowerCase());
+}
+
+function normalizeAnthropicMessages(messages: ProviderMessage[]) {
+  return messages.map(message => ({
+    role: message.role,
+    content: [{ type: 'text', text: message.content }],
+  }));
 }
 
 export async function callAnthropic(
   apiKey: string,
+  model: string,
   systemPrompt: string,
-  messages: AnthropicMessage[],
+  messages: ProviderMessage[],
   maxTokens = 4096
 ): Promise<{ text: string; usage?: { inputTokens: number; outputTokens: number } }> {
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model: 'claude-haiku-4-5-20251001',
-      system: systemPrompt,
-      messages,
-      max_tokens: maxTokens,
-      temperature: 0.7,
-    }),
-  });
+  async function run(selectedModel: string) {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: selectedModel,
+        system: systemPrompt,
+        messages: normalizeAnthropicMessages(messages),
+        max_tokens: maxTokens,
+        temperature: 0.7,
+      }),
+    });
 
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Anthropic API error (): ${error}`);
+    if (!response.ok) {
+      const errorText = await readErrorMessage(response);
+      throw new Error(errorText);
+    }
+
+    const data: AnthropicResponse = await response.json();
+    const text = (data.content ?? [])
+      .filter(block => block.type === 'text')
+      .map(block => block.text ?? '')
+      .join('\n')
+      .trim();
+
+    return {
+      text,
+      usage: {
+        inputTokens: data.usage?.input_tokens ?? 0,
+        outputTokens: data.usage?.output_tokens ?? 0,
+      },
+    };
   }
 
-  const data: AnthropicResponse = await response.json();
-  const contentBlock = data.content?.[0]?.text || '';
+  try {
+    return await run(model);
+  } catch (error) {
+    const errorText = error instanceof Error ? error.message : String(error);
+    if (model !== DEFAULT_ANTHROPIC_FALLBACK_MODEL && isAnthropicModelNotFound(errorText, model)) {
+      return await run(DEFAULT_ANTHROPIC_FALLBACK_MODEL);
+    }
 
-  return {
-    text: contentBlock,
-    usage: {
-      inputTokens: data.usage?.input_tokens || 0,
-      outputTokens: data.usage?.output_tokens || 0,
-    },
-  };
+    throw new Error(`Anthropic API error: ${errorText}`);
+  }
 }
 
 export async function callOpenAI(
   apiKey: string,
+  model: string,
   systemPrompt: string,
-  messages: Array<{ role: 'user' | 'assistant'; content: string }>,
+  messages: ProviderMessage[],
   maxTokens = 4096
 ): Promise<{ text: string; usage?: { inputTokens: number; outputTokens: number } }> {
-  const allMessages = [
-    { role: 'system' as const, content: systemPrompt },
-    ...messages,
-  ];
-
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
+      Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: 'gpt-5.4-nano',
-      messages: allMessages,
+      model,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        ...messages,
+      ],
       max_tokens: maxTokens,
-      temperature: 0.7,
     }),
   });
 
   if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`OpenAI API error (): ${error}`);
+    const errorText = await readErrorMessage(response);
+    throw new Error(`OpenAI API error: ${errorText}`);
   }
 
-  const data: OpenAIResponse = await response.json();
-  const text = data.choices?.[0]?.message?.content || '';
+  const data: OpenAIChatResponse = await response.json();
+  const text = data.choices?.[0]?.message?.content?.trim() ?? '';
 
   return {
     text,
     usage: {
-      inputTokens: data.usage?.prompt_tokens || 0,
-      outputTokens: data.usage?.completion_tokens || 0,
+      inputTokens: data.usage?.prompt_tokens ?? 0,
+      outputTokens: data.usage?.completion_tokens ?? 0,
     },
   };
 }

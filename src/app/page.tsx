@@ -1,1 +1,659 @@
-'use client';import React, { useState, useCallback, useRef } from 'react';import SettingsModal from '../components/SettingsModal';import ChatPanel, { type ChatMessage } from '../components/ChatPanel';import PreviewPanel from '../components/PreviewPanel';import CodePanel from '../components/CodePanel';interface AppConfig {  anthropicKey: string;  openaiKey: string;  systemPrompt: string;}// Default p5.js sketch templateconst DEFAULT_SKETCH = `function setup() {  createCanvas(400, 400);}function draw() {  background(220);  // Draw a circle that follows the mouse  noStroke();  fill(92, 141, 249);  ellipse(mouseX, mouseY, 50, 50);  // Draw some text  fill(0);  textAlign(CENTER);  textSize(16);  text('Move your mouse!', width / 2, 30);}`;export default function Home() {  // App state  const [config, setConfig] = useState<AppConfig>({    anthropicKey: '',    openaiKey: '',    systemPrompt: "You are a helpful p5.js assistant. You help users create interactive creative coding sketches using p5.js. Rules: Always respond with complete, runnable p5.js code in markdown code blocks labeled p5js or javascript. Include all necessary setup() and draw() functions. Use the latest p5.js API. Import via CDN: <script src='https://cdn.jsdelivr.net/npm/p5@1.9.4/lib/p5.min.js'></script> Keep code clean, well-commented, and beginner-friendly. If the user asks for ml5.js features, include the ml5.js CDN import. Never ask users to install anything — everything runs in the browser.",  });  const [activeProvider, setActiveProvider] = useState<'anthropic' | 'openai'>('anthropic');  const [messages, setMessages] = useState<ChatMessage[]>([]);  const [currentCode, setCurrentCode] = useState<string>('');  const [isLoading, setIsLoading] = useState(false);  const [showSettings, setShowSettings] = useState(false);  const [includeMl5, setIncludeMl5] = useState(false);  const [previewError, setPreviewError] = useState<string | null>(null);  const [layout, setLayout] = useState<'split' | 'chat' | 'code'>('split');  const [sessionCount, setSessionCount] = useState(0);  // Initialize from memory (not localStorage for privacy)  React.useEffect(() => {    const saved = sessionStorage.getItem('p5-ai-config');    if (saved) {      try {        const parsed = JSON.parse(saved);        setConfig(parsed);      } catch {}    }  }, []);  // Save to sessionStorage (cleared on tab close — no persistent storage)  React.useEffect(() => {    sessionStorage.setItem('p5-ai-config', JSON.stringify(config));  }, [config]);  const hasApiKey = config.anthropicKey.trim() || config.openaiKey.trim();  function extractCodeBlock(text: string): string {    // Try to find p5js or javascript code block    const p5Regex = /`(?:p5js|javascript)\s*([\s\S]*?)`/;    const jsMatch = text.match(p5Regex);    if (jsMatch) return jsMatch[1].trim();    // Try to find any code block    const codeRegex = /`([\s\S]*?)`/;    const codeMatch = text.match(codeRegex);    if (codeMatch) return codeMatch[1].trim();    return text.trim();  }  function buildApiMessages(userMessage: string): ChatMessage[] {    // Build conversation history for API    const apiMessages: Array<{ role: 'user' | 'assistant'; content: string }> = [];    // Add initial system context    if (currentCode) {      apiMessages.push({        role: 'user',        content: `Here is the current p5.js sketch:\n\n\`\`\`javascript\n${currentCode}\n\`\`\``,      });    } else {      const ml5Note = includeMl5 ? '\nI want to use ml5.js for machine learning features.' : '';      apiMessages.push({ role: 'user', content: userMessage + ml5Note });    }    // Add conversation history (last 6 messages to keep it manageable)    const recentMessages = messages.slice(-6);    for (const msg of recentMessages) {      if (msg.role === 'user') {        apiMessages.push({ role: 'user', content: msg.content });      } else {        // For assistant messages, send the full response including code        const codeInResponse = extractCodeBlock(msg.content);        if (codeInResponse) {          apiMessages.push({ role: 'assistant', content: msg.content });        } else {          apiMessages.push({ role: 'assistant', content: msg.content });        }      }    }    return apiMessages;  }  const sendMessage = useCallback(async (content: string) => {    if (!hasApiKey || isLoading) return;    // Add user message    const userMsg: ChatMessage = {      id: crypto.randomUUID(),      role: 'user',      content,      timestamp: Date.now(),    };    setMessages(prev => [...prev, userMsg]);    setIsLoading(true);    const apiMessages = buildApiMessages(content);    // Call the API route (serverless function)    try {      const apiKey = activeProvider === 'anthropic' ? config.anthropicKey : config.openaiKey;      const response = await fetch('/api/generate', {        method: 'POST',        headers: { 'Content-Type': 'application/json' },        body: JSON.stringify({          provider: activeProvider,          apiKey,          messages: apiMessages,          systemPrompt: config.systemPrompt,          maxTokens: 4096,        }),      });      if (!response.ok) {        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));        throw new Error(errorData.error || `API error (${response.status})`);      }      const data = await response.json();      const code = extractCodeBlock(data.text);      if (code) {        setCurrentCode(code);        setSessionCount(prev => prev + 1);      }      const assistantMsg: ChatMessage = {        id: crypto.randomUUID(),        role: 'assistant',        content: data.text,        timestamp: Date.now(),      };      setMessages(prev => [...prev, assistantMsg]);    } catch (error) {      const errorMsg: ChatMessage = {        id: crypto.randomUUID(),        role: 'assistant',        content: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,        timestamp: Date.now(),      };      setMessages(prev => [...prev, errorMsg]);    } finally {      setIsLoading(false);    }  }, [hasApiKey, isLoading, activeProvider, config, currentCode, messages, includeMl5]);  const handleCodeChange = useCallback((newCode: string) => {    setCurrentCode(newCode);    setSessionCount(prev => prev + 1);  }, []);  function clearChat() {    setMessages([]);  }  function loadSampleSketch() {    setCurrentCode(DEFAULT_SKETCH);  }  return (    <div style={{ display: 'flex', height: '100vh', background: 'var(--bg-primary)', overflow: 'hidden' }}>      {/* Left panel - Chat */}      <div style={{        width: layout === 'chat' ? '100%' : 380,        minWidth: layout === 'chat' ? 0 : 380,        borderRight: layout === 'chat' ? 'none' : '1px solid var(--border-color)',        display: 'flex', flexDirection: 'column',        transition: 'all 0.2s ease',      }}>        <ChatPanel          messages={messages}          onSendMessage={sendMessage}          isLoading={isLoading}          currentProvider={activeProvider}          hasApiKey={hasApiKey}        />      </div>      {/* Main area - Preview + Code */}      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>        {/* Top toolbar */}        <div style={{          display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px',          background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border-color)'        }}>          {/* Layout toggle */}          <div style={{ display: 'flex', gap: 4 }}>            {(['split', 'chat', 'code'] as const).map(l => (              <button                key={l}                className="btn btn-sm "                onClick={() => setLayout(l)}                style={{ textTransform: 'capitalize' }}                title={`Show ${l}`}              >                {l === 'split' ? '?' : l === 'chat' ? '??' : '??'}              </button>            ))}          </div>          <div style={{ width: 1, height: 20, background: 'var(--border-color)' }} />          {/* Provider toggle */}          <div style={{ display: 'flex', gap: 4 }}>            {(['anthropic', 'openai'] as const).map(p => (              <button                key={p}                className="btn btn-sm "                onClick={() => setActiveProvider(p)}                style={{ textTransform: 'capitalize' }}              >                {p === 'anthropic' ? '?? Claude' : '?? GPT'}              </button>            ))}          </div>          <div style={{ width: 1, height: 20, background: 'var(--border-color)' }} />          {/* Actions */}          <button className="btn btn-sm btn-secondary" onClick={clearChat} title="Clear chat">??? Clear</button>          <button className="btn btn-sm btn-success" onClick={loadSampleSketch} title="Load sample sketch">?? Sample</button>          <div style={{ flex: 1 }} />          {/* Session counter */}          {sessionCount > 0 && (            <span className="badge badge-blue" style={{ fontSize: 11 }}>              {sessionCount} sketch{sessionCount > 1 ? 'ses' : ''} generated            </span>          )}          {/* Settings */}          <button            className="btn btn-sm "            onClick={() => setShowSettings(true)}            title="Settings"          >            ??          </button>        </div>        {/* Preview error banner */}        {previewError && (          <div style={{ padding: '6px 12px', background: 'rgba(248, 113, 113, 0.1)', border: '1px solid rgba(248, 113, 113, 0.3)', fontSize: 12, color: '#f87171' }}>            {previewError}          </div>        )}        {/* Preview + Code area */}        <div style={{ flex: 1, display: 'flex', flexDirection: layout === 'chat' ? 'none' : 'row', overflow: 'hidden' }}>          {(layout === 'split' || layout === 'code') && (            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', borderRight: layout === 'code' ? 'none' : '1px solid var(--border-color)', minWidth: 0 }}>              <CodePanel code={currentCode} onCodeChange={handleCodeChange} />            </div>          )}          {(layout === 'split' || layout === 'chat') && (            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>              <PreviewPanel                code={currentCode}                includeMl5={includeMl5}                onToggleMl5={setIncludeMl5}                onError={setPreviewError}              />            </div>          )}        </div>      </div>      {/* Settings modal */}      <SettingsModal        isOpen={showSettings}        onClose={() => setShowSettings(false)}        config={config}        onConfigChange={setConfig}      />    </div>  );}
+'use client';
+
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import ChatPanel from '../components/ChatPanel';
+import CodePanel from '../components/CodePanel';
+import PreviewPanel from '../components/PreviewPanel';
+import SettingsModal from '../components/SettingsModal';
+import WorkspaceDrawer from '../components/WorkspaceDrawer';
+import {
+  DEFAULT_CONFIG,
+  DEFAULT_SKETCH,
+  DEFAULT_HTML_TEMPLATE,
+  type AppConfig,
+  type ChatMessage,
+  type Provider,
+  type ProviderMessage,
+  type SavedSketch,
+  type UploadedAsset,
+  buildAssetContext,
+  normalizeAnthropicModel,
+} from '../lib/types';
+import { extractCodeBlock } from '../lib/types';
+import { clearAssets as clearStoredAssets, loadAssets, saveAssets } from '../lib/assetStore';
+import { extractSketchFromImportedText } from '../lib/sketchImport';
+import { loadSketches, removeSketch, saveSketches, upsertSketch } from '../lib/sketchStore';
+
+type LayoutMode = 'split' | 'chat' | 'code';
+
+interface PersistedAppState {
+  activeProvider: Provider;
+  currentCode: string;
+  messages: ChatMessage[];
+  includeMl5: boolean;
+  layout: LayoutMode;
+  sessionCount: number;
+  activeSketchId: string | null;
+  chatWidth: number;
+  codeWidth: number;
+  htmlTemplate: string;
+  drawerOpen: boolean;
+}
+
+const CONFIG_STORAGE_KEY = 'p5-ai-config';
+const STATE_STORAGE_KEY = 'p5-ai-state';
+const MIN_CHAT_WIDTH = 280;
+const MIN_CODE_WIDTH = 320;
+const DEFAULT_CHAT_WIDTH = 360;
+const DEFAULT_CODE_WIDTH = 520;
+const RESIZE_GRIP_WIDTH = 8;
+
+function composeSystemPrompt(basePrompt: string, includeMl5: boolean, sketchContext: string, assetContext: string): string {
+  const trimmedBase = basePrompt.trim() || DEFAULT_CONFIG.systemPrompt;
+  let prompt = trimmedBase;
+
+  if (includeMl5) {
+    prompt +=
+      '\n\nThe user may want ml5.js features. If so, include the ml5.js CDN script and write code that works in the browser.';
+  }
+
+  if (sketchContext.trim()) {
+    prompt += `\n\nCurrent sketch context:\n\`\`\`javascript\n${sketchContext.trim()}\n\`\`\``;
+  }
+
+  if (assetContext.trim()) {
+    prompt += assetContext;
+  }
+
+  return prompt;
+}
+
+function buildApiMessages(currentCode: string, previousMessages: ChatMessage[], nextMessage: string): ProviderMessage[] {
+  const history: ProviderMessage[] = previousMessages.slice(-8).map(message => ({
+    role: message.role,
+    content: message.content,
+  }));
+
+  const sketchContext = currentCode.trim()
+    ? [
+        {
+          role: 'user' as const,
+          content: `Here is the current p5.js sketch:\n\n\`\`\`javascript\n${currentCode.trim()}\n\`\`\``,
+        },
+      ]
+    : [];
+
+  return [...sketchContext, ...history, { role: 'user', content: nextMessage }];
+}
+
+export default function Home() {
+  const [config, setConfig] = useState<AppConfig>(DEFAULT_CONFIG);
+  const [activeProvider, setActiveProvider] = useState<Provider>('anthropic');
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [currentCode, setCurrentCode] = useState(DEFAULT_SKETCH);
+  const [isLoading, setIsLoading] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [includeMl5, setIncludeMl5] = useState(true);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [layout, setLayout] = useState<LayoutMode>('split');
+  const [sessionCount, setSessionCount] = useState(0);
+  const [assets, setAssets] = useState<UploadedAsset[]>([]);
+  const [assetsLoaded, setAssetsLoaded] = useState(false);
+  const [savedSketches, setSavedSketches] = useState<SavedSketch[]>([]);
+  const [activeSketchId, setActiveSketchId] = useState<string | null>(null);
+  const [chatWidth, setChatWidth] = useState(DEFAULT_CHAT_WIDTH);
+  const [codeWidth, setCodeWidth] = useState(DEFAULT_CODE_WIDTH);
+  const [htmlTemplate, setHtmlTemplate] = useState(DEFAULT_HTML_TEMPLATE);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
+  const dragStateRef = useRef<{ type: 'chat' | 'code' | null; startX: number; startWidth: number }>({
+    type: null,
+    startX: 0,
+    startWidth: 0,
+  });
+
+  useEffect(() => {
+    const savedConfig = sessionStorage.getItem(CONFIG_STORAGE_KEY);
+    if (savedConfig) {
+      try {
+        const parsed = JSON.parse(savedConfig) as Partial<AppConfig>;
+        setConfig(prev => ({
+          ...prev,
+          ...parsed,
+          anthropicModel: normalizeAnthropicModel(parsed.anthropicModel),
+        }));
+      } catch {
+        // Ignore malformed session data.
+      }
+    }
+
+    const savedState = localStorage.getItem(STATE_STORAGE_KEY);
+    if (savedState) {
+      try {
+        const parsed = JSON.parse(savedState) as Partial<PersistedAppState>;
+        if (parsed.activeProvider === 'anthropic' || parsed.activeProvider === 'openai') {
+          setActiveProvider(parsed.activeProvider);
+        }
+        if (typeof parsed.currentCode === 'string') {
+          setCurrentCode(parsed.currentCode);
+        }
+        if (Array.isArray(parsed.messages)) {
+          setMessages(parsed.messages as ChatMessage[]);
+        }
+        if (typeof parsed.includeMl5 === 'boolean') {
+          setIncludeMl5(parsed.includeMl5);
+        }
+        if (parsed.layout === 'split' || parsed.layout === 'chat' || parsed.layout === 'code') {
+          setLayout(parsed.layout);
+        }
+        if (typeof parsed.sessionCount === 'number') {
+          setSessionCount(parsed.sessionCount);
+        }
+        if (typeof parsed.activeSketchId === 'string' || parsed.activeSketchId === null) {
+          setActiveSketchId(parsed.activeSketchId);
+        }
+        if (typeof parsed.chatWidth === 'number') {
+          setChatWidth(Math.max(MIN_CHAT_WIDTH, parsed.chatWidth));
+        }
+        if (typeof parsed.codeWidth === 'number') {
+          setCodeWidth(Math.max(MIN_CODE_WIDTH, parsed.codeWidth));
+        }
+        if (typeof parsed.htmlTemplate === 'string' && parsed.htmlTemplate.trim()) {
+          setHtmlTemplate(parsed.htmlTemplate);
+        }
+        if (typeof parsed.drawerOpen === 'boolean') {
+          setDrawerOpen(parsed.drawerOpen);
+        }
+      } catch {
+        // Ignore malformed saved state.
+      }
+    }
+
+    loadAssets()
+      .then(setAssets)
+      .catch(() => {
+        // Asset storage is optional and may not be available in every browser profile.
+      })
+      .finally(() => {
+        setAssetsLoaded(true);
+      });
+
+    try {
+      setSavedSketches(loadSketches());
+    } catch {
+      setSavedSketches([]);
+    }
+
+    setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    sessionStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(config));
+  }, [config, hydrated]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+
+    const state: PersistedAppState = {
+      activeProvider,
+      currentCode,
+      messages,
+      includeMl5,
+      layout,
+      sessionCount,
+      activeSketchId,
+      chatWidth,
+      codeWidth,
+      htmlTemplate,
+      drawerOpen,
+    };
+
+    localStorage.setItem(STATE_STORAGE_KEY, JSON.stringify(state));
+  }, [activeProvider, currentCode, messages, includeMl5, layout, sessionCount, activeSketchId, chatWidth, codeWidth, htmlTemplate, drawerOpen, hydrated]);
+
+  useEffect(() => {
+    if (!hydrated || !assetsLoaded) return;
+    saveAssets(assets).catch(() => {
+      // If the browser refuses persistence, the current session still works.
+    });
+  }, [assets, hydrated, assetsLoaded]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    saveSketches(savedSketches);
+  }, [savedSketches, hydrated]);
+
+  const providerKey = activeProvider === 'anthropic' ? config.anthropicKey.trim() : config.openaiKey.trim();
+  const hasApiKey = Boolean(providerKey);
+  const anthropicModel = normalizeAnthropicModel(config.anthropicModel);
+  const openaiModel = config.openaiModel.trim() || DEFAULT_CONFIG.openaiModel;
+
+  const sendMessage = useCallback(
+    async (content: string) => {
+      if (!providerKey || isLoading) return;
+
+      const userMsg: ChatMessage = {
+        id: crypto.randomUUID(),
+        role: 'user',
+        content,
+        timestamp: Date.now(),
+      };
+
+      const nextMessages = [...messages, userMsg];
+      setMessages(nextMessages);
+      setIsLoading(true);
+
+      const systemPrompt = composeSystemPrompt(config.systemPrompt, includeMl5, currentCode, buildAssetContext(assets));
+      const apiMessages = buildApiMessages(currentCode, messages, content);
+
+      try {
+        const response = await fetch('/api/generate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            provider: activeProvider,
+            apiKey: providerKey,
+            model: activeProvider === 'anthropic' ? anthropicModel : openaiModel,
+            messages: apiMessages,
+            systemPrompt,
+            maxTokens: 4096,
+          }),
+        });
+
+        if (!response.ok) {
+          const rawError = await response.text().catch(() => '');
+          let message = `API error (${response.status})`;
+          if (rawError) {
+            try {
+              const parsed = JSON.parse(rawError) as { error?: string; message?: string };
+              message = parsed.error || parsed.message || rawError || message;
+            } catch {
+              message = rawError;
+            }
+          }
+          throw new Error(message);
+        }
+
+        const data = (await response.json()) as { text?: string };
+        const text = data.text ?? '';
+        const code = extractCodeBlock(text);
+
+        if (code) {
+          setCurrentCode(code);
+          setActiveSketchId(null);
+          setSessionCount(prev => prev + 1);
+        }
+
+        const assistantMsg: ChatMessage = {
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: text,
+          timestamp: Date.now(),
+        };
+        setMessages(prev => [...prev, assistantMsg]);
+      } catch (error) {
+        const errorMsg: ChatMessage = {
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          timestamp: Date.now(),
+        };
+        setMessages(prev => [...prev, errorMsg]);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [providerKey, isLoading, messages, activeProvider, config.systemPrompt, anthropicModel, openaiModel, includeMl5, currentCode]
+  );
+
+  const handleCodeChange = useCallback((newCode: string) => {
+    setCurrentCode(newCode);
+    setActiveSketchId(null);
+    setSessionCount(prev => prev + 1);
+  }, []);
+
+  const handleSaveSketch = useCallback((code: string) => {
+    setCurrentCode(code);
+    const nextSketches = upsertSketch({
+      id: activeSketchId ?? undefined,
+      name: activeSketchId ? savedSketches.find(sketch => sketch.id === activeSketchId)?.name : undefined,
+      code,
+      existing: savedSketches,
+    });
+    setSavedSketches(nextSketches);
+    setActiveSketchId(activeSketchId ?? nextSketches[0]?.id ?? null);
+    setSessionCount(prev => prev + 1);
+  }, [activeSketchId, savedSketches]);
+
+  const clearChat = useCallback(() => {
+    setMessages([]);
+    setPreviewError(null);
+  }, []);
+
+  const loadSampleSketch = useCallback(() => {
+    setCurrentCode(DEFAULT_SKETCH);
+    setActiveSketchId(null);
+    setSessionCount(prev => prev + 1);
+  }, []);
+
+  const handleAddFiles = useCallback(async (fileList: FileList | File[]) => {
+    const files = Array.from(fileList).filter(file => file.type.startsWith('image/') || file.type.startsWith('audio/'));
+    if (files.length === 0) return;
+
+    const readAsDataUrl = (file: File) =>
+      new Promise<UploadedAsset>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          resolve({
+            id: crypto.randomUUID(),
+            name: file.name,
+            type: file.type,
+            size: file.size,
+            dataUrl: String(reader.result || ''),
+            addedAt: Date.now(),
+          });
+        };
+        reader.onerror = () => reject(new Error(`Failed to read ${file.name}`));
+        reader.readAsDataURL(file);
+      });
+
+    try {
+      const uploadedAssets = await Promise.all(files.map(readAsDataUrl));
+      setAssets(prev => [...prev, ...uploadedAssets]);
+      setSessionCount(prev => prev + uploadedAssets.length);
+    } catch (error) {
+      setPreviewError(error instanceof Error ? error.message : 'Failed to add asset');
+    }
+  }, []);
+
+  const handleLoadSavedSketch = useCallback((sketch: SavedSketch) => {
+    setCurrentCode(sketch.code);
+    setActiveSketchId(sketch.id);
+    setSessionCount(prev => prev + 1);
+  }, []);
+
+  const handleDeleteSketch = useCallback((id: string) => {
+    const nextSketches = removeSketch(id, savedSketches);
+    setSavedSketches(nextSketches);
+    if (activeSketchId === id) {
+      setActiveSketchId(null);
+    }
+  }, [activeSketchId, savedSketches]);
+
+  const handleImportSketchFiles = useCallback(async (fileList: FileList | File[]) => {
+    const files = Array.from(fileList);
+    if (files.length === 0) return;
+
+    const importedSketches: SavedSketch[] = [];
+
+    for (const file of files) {
+      const text = await file.text();
+      const code = extractSketchFromImportedText(text);
+      if (!code) continue;
+
+      const baseName = file.name.replace(/\.[^.]+$/, '') || 'Imported Sketch';
+      const sketch: SavedSketch = {
+        id: crypto.randomUUID(),
+        name: baseName,
+        code,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+      importedSketches.push(sketch);
+    }
+
+    if (importedSketches.length === 0) return;
+
+    const nextSketches = [...importedSketches, ...savedSketches];
+    setSavedSketches(nextSketches);
+    setCurrentCode(importedSketches[0].code);
+    setActiveSketchId(importedSketches[0].id);
+    setSessionCount(prev => prev + importedSketches.length);
+  }, [savedSketches]);
+
+  const startResize = useCallback(
+    (type: 'chat' | 'code', event: React.PointerEvent<HTMLDivElement>) => {
+      if (layout !== 'split') return;
+      event.preventDefault();
+
+      const startX = event.clientX;
+      const startWidth = type === 'chat' ? chatWidth : codeWidth;
+      const maxWidth =
+        type === 'chat'
+          ? Math.max(MIN_CHAT_WIDTH, window.innerWidth - MIN_CODE_WIDTH - 160)
+          : Math.max(MIN_CODE_WIDTH, window.innerWidth - chatWidth - 160);
+
+      const onMove = (moveEvent: PointerEvent) => {
+        const delta = moveEvent.clientX - startX;
+        const nextWidth = Math.max(
+          type === 'chat' ? MIN_CHAT_WIDTH : MIN_CODE_WIDTH,
+          Math.min(startWidth + delta, maxWidth)
+        );
+
+        if (type === 'chat') {
+          setChatWidth(nextWidth);
+        } else {
+          setCodeWidth(nextWidth);
+        }
+      };
+
+      const onUp = () => {
+        window.removeEventListener('pointermove', onMove);
+      };
+
+      window.addEventListener('pointermove', onMove);
+      window.addEventListener('pointerup', onUp, { once: true });
+    },
+    [layout, chatWidth, codeWidth]
+  );
+
+  const handleRemoveAsset = useCallback((id: string) => {
+    setAssets(prev => prev.filter(asset => asset.id !== id));
+  }, []);
+
+  const handleClearAssets = useCallback(() => {
+    setAssets([]);
+    clearStoredAssets().catch(() => {});
+  }, []);
+
+  const layoutButtonLabel = (mode: LayoutMode) => {
+    if (mode === 'split') return 'Split';
+    if (mode === 'chat') return 'Chat';
+    return 'Code';
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: 'var(--bg-primary)', overflow: 'hidden' }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          padding: '8px 12px',
+          background: 'var(--bg-secondary)',
+          borderBottom: '1px solid var(--border-color)',
+          flexWrap: 'wrap',
+        }}
+      >
+        <div style={{ display: 'flex', gap: 4 }}>
+          {(['split', 'chat', 'code'] as const).map(mode => (
+            <button
+              key={mode}
+              type="button"
+              className={`btn btn-sm ${layout === mode ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => setLayout(mode)}
+              style={{ textTransform: 'capitalize' }}
+              title={`Show ${layoutButtonLabel(mode)}`}
+            >
+              {layoutButtonLabel(mode)}
+            </button>
+          ))}
+        </div>
+
+        <div style={{ width: 1, height: 20, background: 'var(--border-color)' }} />
+
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+          {(['anthropic', 'openai'] as const).map(provider => (
+            <button
+              key={provider}
+              type="button"
+              className={`btn btn-sm ${activeProvider === provider ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => setActiveProvider(provider)}
+            >
+              {provider === 'anthropic' ? 'Claude' : 'GPT'}
+            </button>
+          ))}
+        </div>
+
+        <div style={{ width: 1, height: 20, background: 'var(--border-color)' }} />
+
+        <button type="button" className="btn btn-sm btn-secondary" onClick={clearChat} title="Clear chat">
+          Clear Chat
+        </button>
+        <button type="button" className="btn btn-sm btn-success" onClick={loadSampleSketch} title="Load sample sketch">
+          Sample Sketch
+        </button>
+
+        <div style={{ flex: 1 }} />
+
+        {sessionCount > 0 && (
+          <span className="badge badge-blue" style={{ fontSize: 11 }}>
+            {sessionCount} saved or generated sketch{sessionCount > 1 ? 'es' : ''}
+          </span>
+        )}
+
+        <button type="button" className="btn btn-sm btn-secondary" onClick={() => setShowSettings(true)} title="Settings">
+          Settings
+        </button>
+      </div>
+
+      {previewError && (
+        <div
+          style={{
+            padding: '6px 12px',
+            background: 'rgba(248, 113, 113, 0.1)',
+            borderBottom: '1px solid rgba(248, 113, 113, 0.3)',
+            fontSize: 12,
+            color: '#f87171',
+          }}
+        >
+          {previewError}
+        </div>
+      )}
+
+      <div style={{ position: 'relative', flex: 1, display: 'flex', minHeight: 0, overflow: 'hidden' }}>
+        {(layout === 'split' || layout === 'chat') && (
+          <div
+            style={{
+              width: layout === 'split' ? chatWidth : '100%',
+              minWidth: layout === 'split' ? MIN_CHAT_WIDTH : 0,
+              display: 'flex',
+              flexDirection: 'column',
+              minHeight: 0,
+              borderRight: layout === 'split' ? '1px solid var(--border-color)' : 'none',
+            }}
+          >
+            <ChatPanel
+              messages={messages}
+              onSendMessage={sendMessage}
+              isLoading={isLoading}
+              currentProvider={activeProvider}
+              hasApiKey={hasApiKey}
+            />
+          </div>
+        )}
+
+        {layout === 'split' && (
+          <div
+            role="separator"
+            aria-orientation="vertical"
+            onPointerDown={event => startResize('chat', event)}
+            style={{
+              width: RESIZE_GRIP_WIDTH,
+              cursor: 'col-resize',
+              background: 'linear-gradient(180deg, transparent, rgba(92, 141, 249, 0.15), transparent)',
+              flexShrink: 0,
+            }}
+          />
+        )}
+
+        {(layout === 'split' || layout === 'code' || layout === 'chat') && (
+          <div style={{ flex: 1, display: 'flex', minHeight: 0, overflow: 'hidden' }}>
+            {layout !== 'chat' && (
+              <div
+              style={{
+                width: layout === 'split' ? codeWidth : '100%',
+                minWidth: layout === 'split' ? MIN_CODE_WIDTH : 0,
+                display: 'flex',
+                flexDirection: 'column',
+                  minHeight: 0,
+                  borderRight: layout === 'split' ? '1px solid var(--border-color)' : 'none',
+                }}
+              >
+                <CodePanel
+                  code={currentCode}
+                  assets={assets}
+                  htmlTemplate={htmlTemplate}
+                  includeMl5={includeMl5}
+                  onCodeChange={handleCodeChange}
+                  onSaveSketch={handleSaveSketch}
+                />
+              </div>
+            )}
+
+            {layout === 'split' && (
+              <div
+                role="separator"
+                aria-orientation="vertical"
+                onPointerDown={event => startResize('code', event)}
+                style={{
+                  width: RESIZE_GRIP_WIDTH,
+                  cursor: 'col-resize',
+                  background: 'linear-gradient(180deg, transparent, rgba(155, 109, 255, 0.15), transparent)',
+                  flexShrink: 0,
+                }}
+              />
+            )}
+
+            {layout !== 'code' && (
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                <PreviewPanel
+                  code={currentCode}
+                  includeMl5={includeMl5}
+                  assets={assets}
+                  htmlTemplate={htmlTemplate}
+                  onToggleMl5={setIncludeMl5}
+                  onError={setPreviewError}
+                />
+              </div>
+            )}
+          </div>
+        )}
+        <WorkspaceDrawer
+          isOpen={drawerOpen}
+          assets={assets}
+          htmlTemplate={htmlTemplate}
+          onToggleOpen={() => setDrawerOpen(prev => !prev)}
+          onAddFiles={handleAddFiles}
+          onRemoveAsset={handleRemoveAsset}
+          onClearAssets={handleClearAssets}
+          onHtmlTemplateChange={setHtmlTemplate}
+        />
+      </div>
+
+      <SettingsModal
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)}
+        config={config}
+        onConfigChange={setConfig}
+        savedSketches={savedSketches}
+        onLoadSketch={handleLoadSavedSketch}
+        onDeleteSketch={handleDeleteSketch}
+        onImportSketchFiles={handleImportSketchFiles}
+      />
+    </div>
+  );
+}

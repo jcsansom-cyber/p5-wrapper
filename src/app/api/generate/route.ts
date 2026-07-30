@@ -1,1 +1,40 @@
-import { callAnthropic, callOpenAI, extractCode } from '../../../lib/api';export async function POST(req: Request) {  try {    const body = await req.json();    const provider = body.provider;    const apiKey = body.apiKey;    const messages = body.messages;    const systemPrompt = body.systemPrompt;    const maxTokens = body.maxTokens || 4096;    if (!provider || !apiKey || !messages?.length) {      return Response.json({ error: 'Missing required fields' }, { status: 400 });    }    let result: any;    if (provider === 'anthropic') {      result = await callAnthropic(apiKey, systemPrompt, messages, maxTokens);    } else if (provider === 'openai') {      result = await callOpenAI(apiKey, systemPrompt, messages, maxTokens);    } else {      return Response.json({ error: 'Invalid provider' }, { status: 400 });    }    const code = extractCode(result.text);    return Response.json({      success: true,      text: result.text,      code,      usage: result.usage,    });  } catch (error: any) {    console.error('API generation error:', error.message);    return Response.json(      { success: false, error: error.message || 'Failed to generate code' },      { status: 500 }    );  }}
+import { callAnthropic, callOpenAI } from '../../../lib/api';
+import type { GenerateRequestBody } from '../../../lib/types';
+
+export async function POST(req: Request) {
+  try {
+    const body = (await req.json()) as Partial<GenerateRequestBody>;
+    const provider = body.provider;
+    const apiKey = body.apiKey?.trim();
+    const model = body.model?.trim();
+    const messages = body.messages;
+    const systemPrompt = body.systemPrompt?.trim();
+    const maxTokens = body.maxTokens ?? 4096;
+
+    if (!provider || !apiKey || !model || !systemPrompt || !Array.isArray(messages) || messages.length === 0) {
+      return Response.json({ error: 'Missing required fields' }, { status: 400 });
+    }
+
+    const result =
+      provider === 'anthropic'
+        ? await callAnthropic(apiKey, model, systemPrompt, messages, maxTokens)
+        : provider === 'openai'
+          ? await callOpenAI(apiKey, model, systemPrompt, messages, maxTokens)
+          : null;
+
+    if (!result) {
+      return Response.json({ error: 'Invalid provider' }, { status: 400 });
+    }
+
+    return Response.json({
+      success: true,
+      text: result.text,
+      usage: result.usage,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to generate code';
+    console.error('API generation error:', message);
+    return Response.json({ success: false, error: message }, { status: 500 });
+  }
+}
+
