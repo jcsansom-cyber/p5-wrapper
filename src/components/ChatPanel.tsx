@@ -6,7 +6,7 @@ import type { ChatMessage, Provider } from '../lib/types';
 interface ChatPanelProps {
   messages: ChatMessage[];
   onSendMessage: (content: string) => void;
-  onUseStarterPrompt: (content: string) => void;
+  onUseStarterPrompt: () => void;
   isLoading: boolean;
   currentProvider: Provider;
   hasApiKey: boolean;
@@ -167,8 +167,8 @@ export default function ChatPanel({
               <button
                 type="button"
                 className="btn btn-sm btn-primary"
-                onClick={() => onUseStarterPrompt(webcamStarterPrompt)}
-                disabled={!hasApiKey || isLoading}
+                onClick={onUseStarterPrompt}
+                disabled={isLoading}
                 title="Generate a webcam face-tracking starter"
               >
                 Mona Lisa webcam starter

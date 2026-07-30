@@ -35,7 +35,7 @@ export default function WorkspaceDrawer({
   onHtmlTemplateChange,
 }: WorkspaceDrawerProps) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const drawerWidth = 560;
+  const drawerWidth = 680;
 
   return (
     <>

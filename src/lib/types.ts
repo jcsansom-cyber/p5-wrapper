@@ -92,6 +92,7 @@ Rules:
 - Do not use the old ml5.faceApi API.
 - If the sketch needs the camera, make it interactive and explain that it requires HTTPS or localhost.
 - If the sketch needs extra script tags, iframe permissions, or other wrapper changes, return a full HTML document in a fenced \`html\` code block as well as any sketch code.
+- Treat the wrapper HTML and sketch JavaScript as separate files, like p5's index.html and sketch.js.
 - Prefer clean, beginner-friendly code with light comments.
 - When modifying existing sketches, return the full updated sketch instead of a diff.
 - Do not tell the user to install packages locally; everything runs in the browser.
@@ -138,22 +139,11 @@ function draw() {
 }`;
 
 export function extractCodeBlock(text: string): string {
-  const fencedMatch = text.match(/```(?:\s*(?:p5js|javascript|js))?\s*\n([\s\S]*?)```/i);
-  if (fencedMatch?.[1]) {
-    return fencedMatch[1].trim();
-  }
-
-  const anyFenceMatch = text.match(/```\s*\n([\s\S]*?)```/);
-  if (anyFenceMatch?.[1]) {
-    return anyFenceMatch[1].trim();
-  }
-
-  return text.trim();
+  return extractFencedBlock(text, ['p5js', 'javascript', 'js']) || text.trim();
 }
 
 export function extractHtmlTemplate(text: string): string {
-  const fencedMatch = text.match(/```(?:\s*html)?\s*\n([\s\S]*?)```/i);
-  const candidate = fencedMatch?.[1]?.trim() ?? text.trim();
+  const candidate = extractFencedBlock(text, ['html']) || text.trim();
 
   if (!candidate) return '';
 
@@ -166,6 +156,154 @@ export function extractHtmlTemplate(text: string): string {
 
   return looksLikeHtml ? candidate : '';
 }
+
+export function extractFencedBlock(text: string, languages: string[]): string {
+  const fencedBlockRegex = /```([^\n`]*)\n([\s\S]*?)```/g;
+  let match: RegExpExecArray | null;
+
+  while ((match = fencedBlockRegex.exec(text)) !== null) {
+    const label = match[1].trim().toLowerCase();
+    const body = match[2].trim();
+
+    const normalizedLabel = label.split(/\s+/)[0];
+    if (!normalizedLabel) {
+      if (languages.length === 0) return body;
+      continue;
+    }
+
+    if (languages.some(language => language.toLowerCase() === normalizedLabel)) {
+      return body;
+    }
+  }
+
+  return '';
+}
+
+export const MONA_LISA_STARTER_SKETCH = `let video;
+let faceMesh;
+let faces = [];
+
+function preload() {
+  faceMesh = ml5.faceMesh({ detectionConfidence: 0.85 });
+}
+
+function setup() {
+  createCanvas(900, 900);
+  video = createCapture(VIDEO);
+  video.size(640, 480);
+  video.hide();
+  faceMesh.detectStart(video, gotFaces);
+}
+
+function gotFaces(results) {
+  faces = results || [];
+}
+
+function draw() {
+  background(232, 214, 190);
+
+  drawPortrait();
+
+  const gaze = getGazeVector();
+  drawEyes(gaze.x, gaze.y);
+
+  fill(80, 50, 30);
+  noStroke();
+  textAlign(CENTER, CENTER);
+  textSize(14);
+  text(faces.length > 0 ? 'Webcam face detected' : 'Allow webcam access to animate the eyes', width / 2, height - 34);
+}
+
+function drawPortrait() {
+  noStroke();
+
+  fill(78, 54, 34);
+  rect(0, 0, width, 130);
+
+  fill(74, 58, 42);
+  beginShape();
+  vertex(200, 120);
+  bezierVertex(140, 220, 120, 420, 170, 600);
+  bezierVertex(220, 760, 360, 850, 450, 850);
+  bezierVertex(540, 850, 680, 760, 730, 600);
+  bezierVertex(780, 420, 760, 220, 700, 120);
+  endShape(CLOSE);
+
+  fill(221, 194, 162);
+  ellipse(450, 430, 420, 560);
+
+  fill(180, 124, 93);
+  arc(450, 330, 320, 180, PI, TWO_PI);
+  rect(290, 300, 320, 40, 20);
+
+  fill(188, 145, 103);
+  ellipse(450, 540, 220, 300);
+
+  fill(88, 62, 42);
+  rect(265, 620, 370, 130, 40);
+
+  fill(116, 78, 44);
+  beginShape();
+  vertex(180, 760);
+  bezierVertex(280, 680, 620, 680, 720, 760);
+  vertex(720, 900);
+  vertex(180, 900);
+  endShape(CLOSE);
+}
+
+function drawEyes(offsetX, offsetY) {
+  const leftEye = { x: 390, y: 395 };
+  const rightEye = { x: 510, y: 395 };
+  const pupilSize = 20;
+  const maxOffset = 14;
+  const px = constrain(offsetX, -maxOffset, maxOffset);
+  const py = constrain(offsetY, -maxOffset, maxOffset);
+
+  fill(250);
+  ellipse(leftEye.x, leftEye.y, 72, 36);
+  ellipse(rightEye.x, rightEye.y, 72, 36);
+
+  fill(60, 40, 28);
+  ellipse(leftEye.x + px, leftEye.y + py, pupilSize, pupilSize);
+  ellipse(rightEye.x + px, rightEye.y + py, pupilSize, pupilSize);
+
+  fill(40, 26, 18);
+  ellipse(leftEye.x + px + 3, leftEye.y + py - 3, 6, 6);
+  ellipse(rightEye.x + px + 3, rightEye.y + py - 3, 6, 6);
+
+  stroke(110, 72, 50);
+  strokeWeight(3);
+  noFill();
+  arc(leftEye.x, leftEye.y - 2, 80, 50, PI + 0.15, TWO_PI - 0.2);
+  arc(rightEye.x, rightEye.y - 2, 80, 50, PI + 0.15, TWO_PI - 0.2);
+}
+
+function getGazeVector() {
+  if (!faces.length || !faces[0]?.keypoints?.length) {
+    return {
+      x: map(mouseX, 0, width, -12, 12),
+      y: map(mouseY, 0, height, -8, 8),
+    };
+  }
+
+  const keypoints = faces[0].keypoints;
+  const center = keypoints.reduce(
+    (acc, point) => {
+      acc.x += point.x;
+      acc.y += point.y;
+      return acc;
+    },
+    { x: 0, y: 0 }
+  );
+
+  center.x /= keypoints.length;
+  center.y /= keypoints.length;
+
+  return {
+    x: map(center.x, 0, video.width || width, -16, 16),
+    y: map(center.y, 0, video.height || height, -10, 10),
+  };
+}`;
 
 export function buildSystemPrompt(options?: { includeMl5?: boolean; sketchContext?: string }): string {
   const ml5Note = options?.includeMl5

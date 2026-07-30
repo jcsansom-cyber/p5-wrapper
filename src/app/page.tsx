@@ -17,7 +17,9 @@ import {
   type SavedSketch,
   type UploadedAsset,
   buildAssetContext,
+  extractFencedBlock,
   extractHtmlTemplate,
+  MONA_LISA_STARTER_SKETCH,
   normalizeAnthropicModel,
 } from '../lib/types';
 import { extractCodeBlock } from '../lib/types';
@@ -47,10 +49,7 @@ const MIN_CHAT_WIDTH = 280;
 const MIN_CODE_WIDTH = 320;
 const DEFAULT_CHAT_WIDTH = 360;
 const DEFAULT_CODE_WIDTH = 520;
-const WORKSPACE_DRAWER_WIDTH = 560;
 const RESIZE_GRIP_WIDTH = 8;
-const MONA_LISA_STARTER_PROMPT =
-  'Create a Mona Lisa sketch where the eyes follow the viewer through the webcam. Use ml5.faceMesh with createCapture(VIDEO), hide the video element, and include any HTML wrapper or permissions changes needed for webcam access. If helpful, return a full HTML document in a fenced html code block.';
 
 function composeSystemPrompt(basePrompt: string, includeMl5: boolean, sketchContext: string, assetContext: string): string {
   const trimmedBase = basePrompt.trim() || DEFAULT_CONFIG.systemPrompt;
@@ -288,8 +287,10 @@ export default function Home() {
 
         const data = (await response.json()) as { text?: string };
         const text = data.text ?? '';
-        const code = extractCodeBlock(text);
         const htmlTemplateCandidate = extractHtmlTemplate(text);
+        const code = htmlTemplateCandidate
+          ? extractFencedBlock(text, ['p5js', 'javascript', 'js'])
+          : extractCodeBlock(text);
 
         if (code) {
           setCurrentCode(code);
@@ -350,11 +351,15 @@ export default function Home() {
   }, []);
 
   const handleUseStarterPrompt = useCallback(() => {
+    setCurrentCode(MONA_LISA_STARTER_SKETCH);
+    setHtmlTemplate(DEFAULT_HTML_TEMPLATE);
     setIncludeMl5(true);
+    setActiveSketchId(null);
     setDrawerOpen(true);
     setWorkspaceTab('html');
-    void sendMessage(MONA_LISA_STARTER_PROMPT);
-  }, [sendMessage]);
+    setPreviewError(null);
+    setSessionCount(prev => prev + 1);
+  }, []);
 
   const loadSampleSketch = useCallback(() => {
     setCurrentCode(DEFAULT_SKETCH);
