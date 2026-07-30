@@ -52,9 +52,9 @@ export const DEFAULT_HTML_TEMPLATE = `<!DOCTYPE html>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>p5.js Sketch</title>
-  <script src="https://cdn.jsdelivr.net/npm/p5@1.9.4/lib/p5.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/p5@1.9.4/lib/addons/p5.sound.min.js"></script>
-{{ML5_SCRIPT}}
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/addons/p5.sound.min.js"></script>
+  <script src="https://unpkg.com/ml5@1/dist/ml5.min.js"></script>
   <style>
     html, body {
       margin: 0;
@@ -198,6 +198,7 @@ export function buildHtmlFromTemplate(
   options: { sketchSource: string; assets: UploadedAsset[]; includeMl5?: boolean }
 ): string {
   const assetScript = buildAssetRegistryScript(options.assets);
+  const ml5ScriptTag = '<script src="https://unpkg.com/ml5@1/dist/ml5.min.js"></script>';
   const runtimeScript = `<script>
     const sketch = document.getElementById('p5-source')?.textContent || '';
     const errorBox = document.createElement('pre');
@@ -220,6 +221,12 @@ export function buildHtmlFromTemplate(
       reportError(reason);
     });
 
+    window.addEventListener('keydown', function(event) {
+      if (event.key === 'Escape') {
+        window.parent?.postMessage({ type: 'p5-exit-fullscreen' }, '*');
+      }
+    });
+
     try {
       window.eval(sketch);
       window.parent?.postMessage({ type: 'p5-ready' }, '*');
@@ -228,10 +235,7 @@ export function buildHtmlFromTemplate(
     }
   </script>`;
   return template
-    .replaceAll(
-      '{{ML5_SCRIPT}}',
-      options.includeMl5 === false ? '' : '<script src="https://unpkg.com/ml5@latest/dist/ml5.min.js"></script>'
-    )
+    .replaceAll(ml5ScriptTag, options.includeMl5 === false ? '' : ml5ScriptTag)
     .replaceAll('{{ASSET_SCRIPT_TAG}}', `<script>${assetScript.trim()}</script>`)
     .replaceAll('{{ASSET_SCRIPT}}', assetScript.trim())
     .replaceAll('{{SKETCH_SOURCE}}', options.sketchSource)

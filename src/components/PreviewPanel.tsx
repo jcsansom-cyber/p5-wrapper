@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { buildHtmlFromTemplate, type UploadedAsset } from '../lib/types';
 
 interface PreviewPanelProps {
@@ -25,6 +25,10 @@ export default function PreviewPanel({ code, includeMl5, assets, htmlTemplate, o
   const [frameLoaded, setFrameLoaded] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
+  const exitFullscreen = useCallback(() => {
+    setIsFullscreen(false);
+  }, []);
+
   const previewHtml = useMemo(() => {
     return code ? buildPreviewHtml(code, includeMl5, assets, htmlTemplate) : '';
   }, [code, includeMl5, assets, htmlTemplate]);
@@ -44,11 +48,29 @@ export default function PreviewPanel({ code, includeMl5, assets, htmlTemplate, o
       if (event.data?.type === 'p5-ready') {
         onError(null);
       }
+
+      if (event.data?.type === 'p5-exit-fullscreen') {
+        exitFullscreen();
+      }
     }
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [onError]);
+  }, [onError, exitFullscreen]);
+
+  useEffect(() => {
+    if (!isFullscreen) return;
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        exitFullscreen();
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isFullscreen, exitFullscreen]);
 
   useEffect(() => {
     setFrameLoaded(false);
