@@ -1,6 +1,6 @@
-﻿{
-  "buildCommand": "next build",
-  "outputDirectory": ".next",
+{
   "framework": "nextjs",
+  "buildCommand": "npm run build",
+  "installCommand": "npm ci",
   "regions": ["iad1"]
 }
