@@ -54,6 +54,7 @@ export const DEFAULT_HTML_TEMPLATE = `<!DOCTYPE html>
   <meta http-equiv="Permissions-Policy" content="camera=(self), microphone=(self), autoplay=(self), fullscreen=(self)">
   <title>p5.js Sketch</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/addons/p5.dom.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/addons/p5.sound.min.js"></script>
   <script src="https://unpkg.com/ml5@1/dist/ml5.min.js"></script>
   <style>
@@ -87,6 +88,9 @@ Rules:
 - Include the full sketch, including \`setup()\` and \`draw()\` when appropriate.
 - Write code that runs directly in the browser with p5.js.
 - If the user asks for ml5.js features, include the ml5.js CDN script and use it correctly.
+- For live webcam face tracking, prefer ml5.faceMesh with createCapture(VIDEO), hide the video element, and call detectStart(video, callback).
+- Do not use the old ml5.faceApi API.
+- If the sketch needs the camera, make it interactive and explain that it requires HTTPS or localhost.
 - Prefer clean, beginner-friendly code with light comments.
 - When modifying existing sketches, return the full updated sketch instead of a diff.
 - Do not tell the user to install packages locally; everything runs in the browser.
@@ -148,7 +152,7 @@ export function extractCodeBlock(text: string): string {
 
 export function buildSystemPrompt(options?: { includeMl5?: boolean; sketchContext?: string }): string {
   const ml5Note = options?.includeMl5
-    ? `\n- Include ml5.js when the sketch needs machine learning features.\n- Use this CDN script when needed: <script src="https://unpkg.com/ml5@latest/dist/ml5.min.js"></script>`
+    ? `\n- Include ml5.js when the sketch needs machine learning features.\n- Use this CDN script when needed: <script src="https://unpkg.com/ml5@1/dist/ml5.min.js"></script>\n- For face tracking sketches, use ml5.faceMesh with createCapture(VIDEO) instead of the old faceApi API.`
     : '';
 
   const sketchContext = options?.sketchContext?.trim()

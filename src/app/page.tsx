@@ -54,7 +54,10 @@ function composeSystemPrompt(basePrompt: string, includeMl5: boolean, sketchCont
 
   if (includeMl5) {
     prompt +=
-      '\n\nThe user may want ml5.js features. If so, include the ml5.js CDN script and write code that works in the browser.';
+      '\n\nThe user may want ml5.js features. If so, include the ml5.js CDN script and write code that works in the browser.' +
+      '\nFor live webcam face tracking, use ml5.faceMesh with createCapture(VIDEO), hide the video element, and call detectStart(video, callback).' +
+      '\nDo not use the old ml5.faceApi API.' +
+      '\nIf the sketch needs the camera, remind the user it requires HTTPS or localhost.';
   }
 
   if (sketchContext.trim()) {
