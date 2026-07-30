@@ -58,7 +58,8 @@ function composeSystemPrompt(basePrompt: string, includeMl5: boolean, sketchCont
   if (includeMl5) {
     prompt +=
       '\n\nThe user may want ml5.js features. If so, include the ml5.js CDN script and write code that works in the browser.' +
-      '\nFor live webcam face tracking, use ml5.faceMesh with createCapture(VIDEO), hide the video element, and call detectStart(video, callback).' +
+      '\nFor webcam models such as FaceMesh, BodyPose, and HandPose, use createCapture(VIDEO), hide the video element, and call detectStart(video, callback).' +
+      '\nFor image classification or Teachable Machine, choose the matching classifier API and keep the sketch logic separate from the HTML wrapper.' +
       '\nDo not use the old ml5.faceApi API.' +
       '\nIf the sketch needs the camera, remind the user it requires HTTPS or localhost.' +
       '\nIf the sketch needs extra script tags, iframe permissions, or other wrapper changes, you may return a full HTML document in a fenced html code block so the app can apply it.';

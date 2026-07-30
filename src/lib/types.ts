@@ -88,7 +88,8 @@ Rules:
 - Include the full sketch, including \`setup()\` and \`draw()\` when appropriate.
 - Write code that runs directly in the browser with p5.js.
 - If the user asks for ml5.js features, include the ml5.js CDN script and use it correctly.
-- For live webcam face tracking, prefer ml5.faceMesh with createCapture(VIDEO), hide the video element, and call detectStart(video, callback).
+- For live webcam tracking models such as FaceMesh, BodyPose, and HandPose, use createCapture(VIDEO), hide the video element, and call detectStart(video, callback) in the p5.js 1.x style.
+- If the sketch uses image classification or Teachable Machine, use the appropriate ml5 classifier API and keep the model and sketch logic separated.
 - Do not use the old ml5.faceApi API.
 - If the sketch needs the camera, make it interactive and explain that it requires HTTPS or localhost.
 - If the sketch needs extra script tags, iframe permissions, or other wrapper changes, return a full HTML document in a fenced \`html\` code block as well as any sketch code.
@@ -307,7 +308,7 @@ function getGazeVector() {
 
 export function buildSystemPrompt(options?: { includeMl5?: boolean; sketchContext?: string }): string {
   const ml5Note = options?.includeMl5
-    ? `\n- Include ml5.js when the sketch needs machine learning features.\n- Use this CDN script when needed: <script src="https://unpkg.com/ml5@1/dist/ml5.min.js"></script>\n- For face tracking sketches, use ml5.faceMesh with createCapture(VIDEO) instead of the old faceApi API.`
+    ? `\n- Include ml5.js when the sketch needs machine learning features.\n- Use this CDN script when needed: <script src="https://unpkg.com/ml5@1/dist/ml5.min.js"></script>\n- For webcam models such as FaceMesh, BodyPose, and HandPose, use createCapture(VIDEO), hide the video element, and call detectStart(video, callback).\n- For image classification or Teachable Machine, choose the matching classifier API and keep the sketch logic separate from the HTML wrapper.`
     : '';
 
   const sketchContext = options?.sketchContext?.trim()
