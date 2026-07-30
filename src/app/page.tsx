@@ -19,7 +19,6 @@ import {
   buildAssetContext,
   extractFencedBlock,
   extractHtmlTemplate,
-  MONA_LISA_STARTER_SKETCH,
   normalizeAnthropicModel,
 } from '../lib/types';
 import { extractCodeBlock } from '../lib/types';
@@ -351,17 +350,6 @@ export default function Home() {
     setPreviewError(null);
   }, []);
 
-  const handleUseStarterPrompt = useCallback(() => {
-    setCurrentCode(MONA_LISA_STARTER_SKETCH);
-    setHtmlTemplate(DEFAULT_HTML_TEMPLATE);
-    setIncludeMl5(true);
-    setActiveSketchId(null);
-    setDrawerOpen(true);
-    setWorkspaceTab('html');
-    setPreviewError(null);
-    setSessionCount(prev => prev + 1);
-  }, []);
-
   const loadSampleSketch = useCallback(() => {
     setCurrentCode(DEFAULT_SKETCH);
     setActiveSketchId(null);
@@ -548,14 +536,6 @@ export default function Home() {
         <button
           type="button"
           className="btn btn-sm btn-secondary"
-          onClick={handleUseStarterPrompt}
-          title="Generate a webcam face-tracking starter"
-        >
-          Mona Lisa Starter
-        </button>
-        <button
-          type="button"
-          className="btn btn-sm btn-secondary"
           onClick={() => {
             setDrawerOpen(true);
             setWorkspaceTab('html');
@@ -607,7 +587,6 @@ export default function Home() {
             <ChatPanel
               messages={messages}
               onSendMessage={sendMessage}
-              onUseStarterPrompt={handleUseStarterPrompt}
               isLoading={isLoading}
               currentProvider={activeProvider}
               hasApiKey={hasApiKey}
