@@ -176,7 +176,7 @@ export default function Home() {
   const [currentCode, setCurrentCode] = useState(DEFAULT_SKETCH);
   const [isLoading, setIsLoading] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [includeMl5, setIncludeMl5] = useState(true);
+  const [includeMl5, setIncludeMl5] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [layout, setLayout] = useState<LayoutMode>('split');
   const [sessionCount, setSessionCount] = useState(0);

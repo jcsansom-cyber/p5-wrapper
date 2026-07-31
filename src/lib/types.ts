@@ -327,9 +327,8 @@ export function buildHtmlFromTemplate(
 
     return `${runtimeTags}\n${withoutRuntimeDuplicates}`;
   };
+  const previewTemplate = template.includes('{{SKETCH_SOURCE}}') ? template : DEFAULT_HTML_TEMPLATE;
   const runtimeScript = `<script>
-    const sketch = document.getElementById('p5-source')?.textContent || '';
-    const sketchLower = sketch.toLowerCase();
     const errorBox = document.createElement('pre');
     errorBox.id = 'p5-error';
     errorBox.style.cssText = 'display:none;position:fixed;left:12px;right:12px;bottom:12px;padding:12px;border-radius:8px;background:rgba(248,113,113,0.12);color:#fda4af;font-family:monospace;font-size:12px;white-space:pre-wrap;border:1px solid rgba(248,113,113,0.24);z-index:9999;';
@@ -356,14 +355,13 @@ export function buildHtmlFromTemplate(
       }
     });
 
-    try {
-      window.eval(sketch);
+    // The source script has already run during HTML parsing. Evaluating it again
+    // breaks sketches that declare top-level let/const variables.
+    requestAnimationFrame(function() {
       window.parent?.postMessage({ type: 'p5-ready' }, '*');
-    } catch (error) {
-      reportError(error && error.message ? error.message : String(error));
-    }
+    });
   </script>`;
-  return injectRuntimeLibraries(template)
+  return injectRuntimeLibraries(previewTemplate)
     .replaceAll('{{ASSET_SCRIPT_TAG}}', `<script>${assetScript.trim()}</script>`)
     .replaceAll('{{ASSET_SCRIPT}}', assetScript.trim())
     .replaceAll('{{SKETCH_SOURCE}}', options.sketchSource)
