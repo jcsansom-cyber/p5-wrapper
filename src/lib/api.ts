@@ -121,7 +121,6 @@ export async function callAnthropic(
         system: systemPrompt,
         messages: normalizeAnthropicMessages(messages),
         max_tokens: maxTokens,
-        temperature: 0.7,
       }),
     });
 
