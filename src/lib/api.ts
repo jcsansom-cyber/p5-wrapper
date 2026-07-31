@@ -35,37 +35,57 @@ function isAnthropicModelNotFound(errorText: string, model: string): boolean {
   return lower.includes('not_found_error') && lower.includes(model.toLowerCase());
 }
 
-function normalizeAnthropicMessages(messages: ProviderMessage[]) {
-  return messages.map(message => ({
-    role: message.role,
-    content: normalizeAnthropicContent(message.content),
-  }));
-}
+type AnthropicContent = Array<
+  | { type: 'text'; text: string }
+  | {
+      type: 'image';
+      source: {
+        type: 'base64';
+        media_type: string;
+        data: string;
+      };
+    }
+>;
 
-function normalizeAnthropicContent(content: ProviderMessage['content']) {
-  if (typeof content === 'string') {
-    return [{ type: 'text', text: content }];
+function normalizeAnthropicMessages(messages: ProviderMessage[]) {
+  const normalized: Array<{ role: ProviderMessage['role']; content: AnthropicContent }> = [];
+
+  for (const message of messages) {
+    const content = normalizeAnthropicContent(message.content);
+    if (!content.length) continue;
+
+    const previous = normalized.at(-1);
+    if (previous?.role === message.role) {
+      previous.content.push(...content);
+    } else {
+      normalized.push({ role: message.role, content });
+    }
   }
 
-  const normalized: Array<
-    | { type: 'text'; text: string }
-    | {
-        type: 'image';
-        source: {
-          type: 'base64';
-          media_type: string;
-          data: string;
-        };
-      }
-  > = [];
+  // Anthropic requires at least one non-empty message, even when the client sent
+  // only whitespace or an upload whose preview could not be prepared.
+  return normalized.length
+    ? normalized
+    : [{ role: 'user' as const, content: [{ type: 'text' as const, text: 'Please help create a p5.js sketch.' }] }];
+}
+
+function normalizeAnthropicContent(content: ProviderMessage['content']): AnthropicContent {
+  if (typeof content === 'string') {
+    const text = content.trim();
+    return text ? [{ type: 'text', text }] : [];
+  }
+
+  const normalized: AnthropicContent = [];
 
   for (const part of content) {
     if (part.type === 'text') {
-      normalized.push({ type: 'text', text: part.text });
+      const text = part.text.trim();
+      if (text) normalized.push({ type: 'text', text });
       continue;
     }
 
     const [prefix, base64 = ''] = part.dataUrl.split(',');
+    if (!base64.trim()) continue;
     const mediaTypeMatch = prefix.match(/^data:([^;]+);base64$/i);
     const mediaType = mediaTypeMatch?.[1] || part.mediaType || 'image/png';
 

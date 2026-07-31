@@ -118,10 +118,13 @@ async function buildApiMessages(
   nextMessage: string,
   assets: UploadedAsset[]
 ): Promise<ProviderMessage[]> {
-  const history: ProviderMessage[] = previousMessages.slice(-6).map(message => ({
-    role: message.role,
-    content: truncateText(message.content, 4000),
-  }));
+  const history: ProviderMessage[] = previousMessages
+    .slice(-6)
+    .filter(message => message.content.trim())
+    .map(message => ({
+      role: message.role,
+      content: truncateText(message.content, 4000),
+    }));
 
   const sketchContext = currentCode.trim()
     ? [
@@ -160,11 +163,14 @@ async function buildApiMessages(
       ? {
           role: 'user',
           content: [
-            { type: 'text', text: truncateText([nextMessage, assetGuidanceText].filter(Boolean).join('\n\n'), 2500) },
+            {
+              type: 'text',
+              text: truncateText([nextMessage, assetGuidanceText].filter(Boolean).join('\n\n'), 2500) || 'Please use the uploaded assets in the sketch.',
+            },
             ...imageParts,
           ],
         }
-      : { role: 'user', content: truncateText(nextMessage, 2000) };
+      : { role: 'user', content: truncateText(nextMessage, 2000) || 'Please help create a p5.js sketch.' };
 
   return [...sketchContext, ...history, nextUserMessage];
 }
