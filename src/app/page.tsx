@@ -21,7 +21,6 @@ import {
   extractFencedBlock,
   extractHtmlTemplate,
   normalizeAnthropicModel,
-  usesMl5Features,
 } from '../lib/types';
 import { extractCodeBlock } from '../lib/types';
 import { clearAssets as clearStoredAssets, loadAssets, saveAssets } from '../lib/assetStore';
@@ -34,7 +33,6 @@ interface PersistedAppState {
   activeProvider: Provider;
   currentCode: string;
   messages: ChatMessage[];
-  includeMl5: boolean;
   layout: LayoutMode;
   sessionCount: number;
   activeSketchId: string | null;
@@ -182,7 +180,6 @@ export default function Home() {
   const [currentCode, setCurrentCode] = useState(DEFAULT_SKETCH);
   const [isLoading, setIsLoading] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [includeMl5, setIncludeMl5] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [layout, setLayout] = useState<LayoutMode>('split');
   const [sessionCount, setSessionCount] = useState(0);
@@ -279,9 +276,6 @@ export default function Home() {
         if (Array.isArray(parsed.messages)) {
           setMessages(parsed.messages as ChatMessage[]);
         }
-        if (typeof parsed.includeMl5 === 'boolean') {
-          setIncludeMl5(parsed.includeMl5);
-        }
         if (parsed.layout === 'split' || parsed.layout === 'chat' || parsed.layout === 'code') {
           setLayout(parsed.layout);
         }
@@ -338,7 +332,6 @@ export default function Home() {
       activeProvider,
       currentCode,
       messages,
-      includeMl5,
       layout,
       sessionCount,
       activeSketchId,
@@ -349,7 +342,7 @@ export default function Home() {
     };
 
     localStorage.setItem(STATE_STORAGE_KEY, JSON.stringify(state));
-  }, [activeProvider, currentCode, messages, includeMl5, layout, sessionCount, activeSketchId, chatWidth, codeWidth, htmlTemplate, drawerOpen, hydrated]);
+  }, [activeProvider, currentCode, messages, layout, sessionCount, activeSketchId, chatWidth, codeWidth, htmlTemplate, drawerOpen, hydrated]);
 
   useEffect(() => {
     if (!hydrated || !assetsLoaded) return;
@@ -367,8 +360,7 @@ export default function Home() {
   const hasApiKey = Boolean(providerKey);
   const anthropicModel = normalizeAnthropicModel(config.anthropicModel);
   const openaiModel = config.openaiModel.trim() || DEFAULT_CONFIG.openaiModel;
-  const sketchUsesMl5 = usesMl5Features(currentCode);
-  const effectiveIncludeMl5 = includeMl5 || sketchUsesMl5;
+  const effectiveIncludeMl5 = true;
 
   const sendMessage = useCallback(
     async (content: string) => {
@@ -433,8 +425,6 @@ export default function Home() {
 
         if (htmlTemplateCandidate) {
           setHtmlTemplate(htmlTemplateCandidate);
-          setDrawerOpen(true);
-          setWorkspaceTab('html');
           setSessionCount(prev => prev + 1);
         }
 
@@ -457,7 +447,7 @@ export default function Home() {
         setIsLoading(false);
       }
     },
-    [providerKey, isLoading, messages, activeProvider, config.systemPrompt, anthropicModel, openaiModel, includeMl5, currentCode, assets]
+    [providerKey, isLoading, messages, activeProvider, config.systemPrompt, anthropicModel, openaiModel, currentCode, assets]
   );
 
   const handleCodeChange = useCallback((newCode: string) => {
@@ -803,10 +793,8 @@ export default function Home() {
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
                 <PreviewPanel
                   code={currentCode}
-                  includeMl5={effectiveIncludeMl5}
                   assets={assets}
                   htmlTemplate={htmlTemplate}
-                  onToggleMl5={setIncludeMl5}
                   onError={setPreviewError}
                 />
               </div>

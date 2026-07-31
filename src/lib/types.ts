@@ -338,7 +338,15 @@ export function buildHtmlFromTemplate(
       errorBox.textContent = message;
       errorBox.style.display = 'block';
       window.parent?.postMessage({ type: 'p5-error', message }, '*');
+      window.parent?.postMessage({ type: 'p5-console', message }, '*');
     }
+
+    const originalConsoleError = console.error.bind(console);
+    console.error = function(...args) {
+      const message = args.map(value => value instanceof Error ? value.message : String(value)).join(' ');
+      window.parent?.postMessage({ type: 'p5-console', message }, '*');
+      originalConsoleError(...args);
+    };
 
     window.addEventListener('error', function(event) {
       reportError(event.message || 'Unknown preview error');
