@@ -150,7 +150,7 @@ export default function PreviewPanel({ code, includeMl5, assets, htmlTemplate, o
               setFrameLoaded(true);
             }}
             style={sketchStyle}
-            sandbox="allow-scripts allow-same-origin"
+            sandbox="allow-scripts"
             allow="camera; microphone; autoplay; fullscreen"
           />
         ) : (

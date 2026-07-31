@@ -305,6 +305,21 @@ export function buildHtmlFromTemplate(
 ): string {
   const assetScript = buildAssetRegistryScript(options.assets);
   const ml5ScriptTag = '<script src="https://unpkg.com/ml5@1/dist/ml5.min.js"></script>';
+  const injectMl5Script = (html: string): string => {
+    if (options.includeMl5 === false) {
+      return html.replaceAll(ml5ScriptTag, '');
+    }
+
+    if (html.includes(ml5ScriptTag)) {
+      return html;
+    }
+
+    if (html.includes('</head>')) {
+      return html.replace('</head>', `  ${ml5ScriptTag}\n</head>`);
+    }
+
+    return `${ml5ScriptTag}\n${html}`;
+  };
   const runtimeScript = `<script>
     const sketch = document.getElementById('p5-source')?.textContent || '';
     const errorBox = document.createElement('pre');
@@ -340,8 +355,7 @@ export function buildHtmlFromTemplate(
       reportError(error && error.message ? error.message : String(error));
     }
   </script>`;
-  return template
-    .replaceAll(ml5ScriptTag, options.includeMl5 === false ? '' : ml5ScriptTag)
+  return injectMl5Script(template)
     .replaceAll('{{ASSET_SCRIPT_TAG}}', `<script>${assetScript.trim()}</script>`)
     .replaceAll('{{ASSET_SCRIPT}}', assetScript.trim())
     .replaceAll('{{SKETCH_SOURCE}}', options.sketchSource)
