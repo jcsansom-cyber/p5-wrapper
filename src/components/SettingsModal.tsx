@@ -126,7 +126,7 @@ export default function SettingsModal({
               className="input"
               value={config.anthropicModel}
               onChange={e => onConfigChange({ ...config, anthropicModel: e.target.value })}
-              placeholder="claude-sonnet-4-20250514"
+              placeholder="claude-opus-5"
             />
             <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
               {ANTHROPIC_MODEL_OPTIONS.map(option => (
@@ -141,7 +141,7 @@ export default function SettingsModal({
               ))}
             </div>
             <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
-              Claude Haiku 4.5 is the default low-cost Anthropic option we support, and you can still paste a custom Claude model ID if needed.
+              Claude Opus 5 is the new default, and you can still paste a custom Claude model ID if needed.
             </p>
           </div>
 
@@ -168,10 +168,10 @@ export default function SettingsModal({
               className="input"
               value={config.openaiModel}
               onChange={e => onConfigChange({ ...config, openaiModel: e.target.value })}
-              placeholder="gpt-5-nano-2025-08-07"
+              placeholder="gpt-5.6-sol"
             />
             <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
-              GPT-4.1 nano is the lowest-cost OpenAI option we support here.
+              GPT-5.6 Terra is the default balanced OpenAI option we support here.
             </p>
             <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
               {OPENAI_MODEL_OPTIONS.map(option => (

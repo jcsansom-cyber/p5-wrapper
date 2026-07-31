@@ -10,7 +10,7 @@ interface OpenAIChatResponse {
   usage?: { prompt_tokens?: number; completion_tokens?: number };
 }
 
-const DEFAULT_ANTHROPIC_FALLBACK_MODEL = 'claude-haiku-4-5';
+const DEFAULT_ANTHROPIC_FALLBACK_MODEL = 'claude-opus-5';
 
 async function readErrorMessage(response: Response): Promise<string> {
   const rawText = await response.text().catch(() => '');

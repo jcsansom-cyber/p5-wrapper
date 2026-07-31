@@ -103,12 +103,15 @@ Rules:
 - Include the full sketch, including \`setup()\` and \`draw()\` when appropriate.
 - Write code that runs directly in the browser with p5.js.
 - If the user asks for ml5.js features, include the ml5.js CDN script and use it correctly.
-- For live webcam tracking models such as FaceMesh, BodyPose, and HandPose, use createCapture(VIDEO), hide the video element, and call detectStart(video, callback) in the p5.js 1.x style.
-- For FaceMesh specifically, default to \`faceMesh = ml5.faceMesh({ maxFaces: 1, flipped: true })\` in \`preload()\`, create the webcam with \`video = createCapture(VIDEO)\` or \`createCapture(VIDEO, { flipped: true })\`, hide it, and then call \`faceMesh.detectStart(video, callback)\` in \`setup()\`. Keep the model setup simple and do not wait on a manual loading callback.
-- For BodyPose specifically, default to \`ml5.bodyPose("MoveNet", { flipped: true })\` in \`preload()\` and then call \`detectStart(video, callback)\` in \`setup()\`. If the sketch needs BlazePose instead, choose it explicitly and keep the camera mirrored.
-- Do not use the newer async constructor pattern in this app; the runtime is p5.js 1.x style, so stick to preload/setup plus detectStart.
+- For live webcam tracking models such as FaceMesh, BodyPose, and HandPose, use the exact p5 editor pattern: create the model in \`preload()\` when appropriate, create the webcam with \`createCapture(VIDEO)\` in \`setup()\`, hide the video element, and call \`detectStart(video, callback)\` in the p5.js 1.x style.
+- For FaceMesh, mirror the p5 editor example exactly: \`faceMesh = ml5.faceMesh({ maxFaces: 1, flipped: true })\` in \`preload()\`, \`video = createCapture(VIDEO, { flipped: true })\` or \`video = createCapture(VIDEO)\` plus canvas mirroring, then \`faceMesh.detectStart(video, gotFaces)\` in \`setup()\`.
+- For BodyPose, mirror the p5 editor example exactly: \`bodyPose = ml5.bodyPose()\` in \`preload()\`, \`video = createCapture(VIDEO)\`, then \`bodyPose.detectStart(video, gotPoses)\` in \`setup()\`.
+- For HandPose, mirror the p5 editor example exactly: \`handPose = ml5.handPose()\` in \`preload()\`, \`video = createCapture(VIDEO)\`, then \`handPose.detectStart(video, gotHands)\` in \`setup()\`.
+- Never use \`ml5.handPose({ flipped: true })\`, \`ml5.bodyPose("...")\`, or any older async constructor pattern for these webcam trackers.
+- Do not use the older async constructor pattern in this app; the runtime is p5.js 1.x style, so stick to preload/setup plus detectStart.
 - When a sketch needs webcam input, request it immediately by creating the capture in setup and hiding it. Do not wait for a button click or a separate loading callback.
 - If the sketch uses image classification or Teachable Machine, use the appropriate ml5 classifier API and keep the model and sketch logic separated.
+- If the user uploaded an image and wants it used in the sketch, load it from the local asset registry with \`p5AssetURL("exact-file-name")\` and \`loadImage(...)\`. Do not invent remote URLs like Wikimedia, Unsplash, or placeholder image links.
 - Do not use the old ml5.faceApi API.
 - If the sketch needs the camera, make it interactive and explain that it requires HTTPS or localhost.
 - If the sketch needs extra script tags, iframe permissions, or other wrapper changes, return a full HTML document in a fenced \`html\` code block as well as any sketch code.
@@ -124,18 +127,19 @@ Rules:
 export const DEFAULT_CONFIG: AppConfig = {
   anthropicKey: '',
   openaiKey: '',
-  anthropicModel: 'claude-haiku-4-5',
-  openaiModel: 'gpt-4.1-nano-2025-04-14',
+  anthropicModel: 'claude-opus-5',
+  openaiModel: 'gpt-5.6-terra',
   systemPrompt: DEFAULT_SYSTEM_PROMPT,
 };
 
 export const ANTHROPIC_MODEL_OPTIONS = [
-  { value: 'claude-haiku-4-5', label: 'Claude Haiku 4.5' },
+  { value: 'claude-opus-5', label: 'Claude Opus 5' },
 ] as const;
 
 export const OPENAI_MODEL_OPTIONS = [
-  { value: 'gpt-4.1-nano-2025-04-14', label: 'GPT-4.1 nano' },
-  { value: 'gpt-4.1-mini-2025-04-14', label: 'GPT-4.1 mini' },
+  { value: 'gpt-5.6-sol', label: 'GPT-5.6 Sol' },
+  { value: 'gpt-5.6-terra', label: 'GPT-5.6 Terra' },
+  { value: 'gpt-5.6-luna', label: 'GPT-5.6 Luna' },
 ] as const;
 
 export function normalizeAnthropicModel(model: string | undefined | null): string {
@@ -252,7 +256,7 @@ function looksLikeHtmlTemplate(candidate: string): boolean {
 
 export function buildSystemPrompt(options?: { includeMl5?: boolean; sketchContext?: string }): string {
   const ml5Note = options?.includeMl5
-    ? `\n- Include ml5.js when the sketch needs machine learning features.\n- Use this CDN script when needed: <script src="https://unpkg.com/ml5@1/dist/ml5.min.js"></script>\n- For webcam models such as FaceMesh, BodyPose, and HandPose, use createCapture(VIDEO), hide the video element, and call detectStart(video, callback).\n- For FaceMesh, default to \`faceMesh = ml5.faceMesh({ maxFaces: 1, flipped: true })\` in \`preload()\`, create the webcam with \`video = createCapture(VIDEO)\` or \`createCapture(VIDEO, { flipped: true })\`, hide it, and call \`faceMesh.detectStart(video, callback)\` in \`setup()\`.\n- For BodyPose, default to \`ml5.bodyPose("MoveNet", { flipped: true })\` in \`preload()\` and \`detectStart(video, callback)\` in \`setup()\`. If the user asks for BlazePose, choose it explicitly and keep the camera mirrored.\n- For image classification or Teachable Machine, choose the matching classifier API and keep the model and sketch logic separate from the HTML wrapper.`
+    ? `\n- Include ml5.js when the sketch needs machine learning features.\n- Use this CDN script when needed: <script src="https://unpkg.com/ml5@1/dist/ml5.min.js"></script>\n- For webcam models such as FaceMesh, BodyPose, and HandPose, use createCapture(VIDEO), hide the video element, and call detectStart(video, callback).\n- For FaceMesh, initialize with \`faceMesh = ml5.faceMesh({ maxFaces: 1, flipped: true })\` in \`preload()\`, create the webcam with \`video = createCapture(VIDEO, { flipped: true })\` or \`video = createCapture(VIDEO)\` plus canvas mirroring, hide it, and call \`faceMesh.detectStart(video, gotFaces)\` in \`setup()\`.\n- For BodyPose, initialize with \`bodyPose = ml5.bodyPose()\` in \`preload()\`, create the webcam with \`video = createCapture(VIDEO)\`, hide it, and call \`bodyPose.detectStart(video, gotPoses)\` in \`setup()\`.\n- For HandPose, initialize with \`handPose = ml5.handPose()\` in \`preload()\`, create the webcam with \`video = createCapture(VIDEO)\`, hide it, and call \`handPose.detectStart(video, gotHands)\` in \`setup()\`.\n- For image classification or Teachable Machine, choose the matching classifier API and keep the model and sketch logic separate from the HTML wrapper.`
     : '';
 
   const sketchContext = options?.sketchContext?.trim()
@@ -274,7 +278,7 @@ export function buildAssetContext(assets: UploadedAsset[]): string {
   const imageNames = imageAssets.map(asset => `- ${asset.name}`).join('\n');
   const mostRecentImage = imageAssets.slice().sort((a, b) => b.addedAt - a.addedAt)[0];
 
-  return `\n\nUploaded assets available to the sketch:\n${lines}\n\nExact image filenames available:\n${imageNames || '- None'}\n\nUse p5AssetURL("exact-file-name") to load an uploaded asset by exact name. Example: \`loadImage(p5AssetURL("image.png"))\` or \`loadSound(p5AssetURL("music.mp3"))\`. Do not invent filenames or ask the user to rename files. If the user asks you to use an uploaded image, prefer the most recent uploaded image asset${mostRecentImage ? `: \`${mostRecentImage.name}\`` : ''}. Text files, JSON, and other assets are also available as data URLs.${imageAssets.length ? '\nIf the user uploaded a photo or image, inspect it directly and use it as visual context for the request.' : ''}${hasLocalOnlyMedia ? '\nAudio and video uploads stay local to the browser and are not attached to the AI request as media input.' : ''}`;
+  return `\n\nUploaded assets available to the sketch:\n${lines}\n\nExact image filenames available:\n${imageNames || '- None'}\n\nUse \`p5AssetURL("exact-file-name")\` to load an uploaded asset by exact name. Example: \`loadImage(p5AssetURL("image.png"))\` or \`loadSound(p5AssetURL("music.mp3"))\`. Do not invent filenames or ask the user to rename files. If the user asks you to use an uploaded image, prefer the most recent uploaded image asset${mostRecentImage ? `: \`${mostRecentImage.name}\`` : ''}. If you reference an uploaded image in code, load it with \`loadImage(p5AssetURL("the-exact-name"))\` rather than a remote URL. Never substitute an internet image URL for an uploaded file. Text files, JSON, and other assets are also available as data URLs.${imageAssets.length ? '\nIf the user uploaded a photo or image, inspect it directly and use it as visual context for the request.' : ''}${hasLocalOnlyMedia ? '\nAudio and video uploads stay local to the browser and are not attached to the AI request as media input.' : ''}`;
 }
 
 export function buildAssetRegistryScript(assets: UploadedAsset[]): string {

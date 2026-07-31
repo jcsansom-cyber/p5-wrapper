@@ -60,8 +60,10 @@ function composeSystemPrompt(basePrompt: string, includeMl5: boolean, sketchCont
   if (includeMl5) {
     prompt +=
       '\n\nThe user may want ml5.js features. If so, include the ml5.js CDN script and write code that works in the browser.' +
-      '\nFor webcam models such as FaceMesh, BodyPose, and HandPose, use createCapture(VIDEO), hide the video element, and call detectStart(video, callback).' +
+      '\nFor webcam models such as FaceMesh, BodyPose, and HandPose, use the exact p5 editor pattern: createCapture(VIDEO) in setup, hide the video element, and call detectStart(video, callback).' +
+      '\nFor FaceMesh, BodyPose, and HandPose, do not use older async constructors or custom model options that the p5 editor examples do not use.' +
       '\nFor image classification or Teachable Machine, choose the matching classifier API and keep the sketch logic separate from the HTML wrapper.' +
+      '\nIf the user uploaded an image, use the local uploaded asset via p5AssetURL("exact-file-name") and loadImage(...). Never replace an uploaded file with a remote image URL.' +
       '\nDo not use the old ml5.faceApi API.' +
       '\nIf the sketch needs the camera, remind the user it requires HTTPS or localhost.' +
       '\nIf the sketch needs extra script tags, iframe permissions, or other wrapper changes, you may return a full HTML document in a fenced html code block so the app can apply it.';
@@ -143,12 +145,21 @@ async function buildApiMessages(
     });
   }
 
+  const assetGuidanceText = assets.length
+    ? [
+        'Uploaded assets are available in the workspace.',
+        'Use exact uploaded filenames with p5AssetURL("exact-file-name") when you need a local file.',
+        'Do not invent remote URLs for user-uploaded images, audio, or video.',
+        imageAssets.length ? `Available image files: ${imageAssets.map(asset => asset.name).join(', ')}` : 'No image assets are currently uploaded.',
+      ].join(' ')
+    : '';
+
   const nextUserMessage: ProviderMessage =
-    imageParts.length > 0
+    imageParts.length > 0 || assetGuidanceText
       ? {
           role: 'user',
           content: [
-            { type: 'text', text: truncateText(nextMessage, 2000) },
+            { type: 'text', text: truncateText([nextMessage, assetGuidanceText].filter(Boolean).join('\n\n'), 2500) },
             ...imageParts,
           ],
         }
