@@ -218,8 +218,9 @@ export function buildAssetContext(assets: UploadedAsset[]): string {
     .join('\n');
 
   const hasImages = assets.some(asset => asset.type.startsWith('image/'));
+  const hasLocalOnlyMedia = assets.some(asset => asset.type.startsWith('audio/') || asset.type.startsWith('video/'));
 
-  return `\n\nUploaded assets available to the sketch:\n${lines}\n\nUse p5AssetURL("filename") to load an uploaded asset by name. For example: loadImage(p5AssetURL("image.png")) or loadSound(p5AssetURL("music.mp3")). Text files, JSON, and other assets are also available as data URLs.${hasImages ? '\nIf the user uploaded a photo or image, inspect it directly and use it as visual context for the request.' : ''}`;
+  return `\n\nUploaded assets available to the sketch:\n${lines}\n\nUse p5AssetURL("filename") to load an uploaded asset by name. For example: loadImage(p5AssetURL("image.png")) or loadSound(p5AssetURL("music.mp3")). Text files, JSON, and other assets are also available as data URLs.${hasImages ? '\nIf the user uploaded a photo or image, inspect it directly and use it as visual context for the request.' : ''}${hasLocalOnlyMedia ? '\nAudio and video uploads stay local to the browser and are not attached to the AI request as media input.' : ''}`;
 }
 
 export function buildAssetRegistryScript(assets: UploadedAsset[]): string {

@@ -50,6 +50,7 @@ const MIN_CODE_WIDTH = 320;
 const DEFAULT_CHAT_WIDTH = 360;
 const DEFAULT_CODE_WIDTH = 520;
 const RESIZE_GRIP_WIDTH = 8;
+const MAX_NON_IMAGE_UPLOAD_BYTES = 25 * 1024 * 1024;
 
 function composeSystemPrompt(basePrompt: string, includeMl5: boolean, sketchContext: string, assetContext: string): string {
   const trimmedBase = basePrompt.trim() || DEFAULT_CONFIG.systemPrompt;
@@ -98,6 +99,8 @@ function buildApiMessages(
 
   const imageParts: PromptContentPart[] = assets
     .filter(asset => asset.type.startsWith('image/'))
+    .sort((a, b) => b.addedAt - a.addedAt)
+    .slice(0, 1)
     .map(asset => ({
       type: 'image' as const,
       mediaType: asset.type || 'image/png',
@@ -144,6 +147,55 @@ export default function Home() {
     startX: 0,
     startWidth: 0,
   });
+
+  async function compressImageFile(file: File): Promise<string> {
+    const maxDimension = 1280;
+    const quality = 0.85;
+    const sourceUrl = URL.createObjectURL(file);
+
+    try {
+      const bitmap = await createImageBitmap(file).catch(() => null);
+      const width = bitmap?.width ?? 0;
+      const height = bitmap?.height ?? 0;
+
+      if (!bitmap || !width || !height) {
+        return await new Promise<string>((resolve, reject) => {
+          const img = new Image();
+          img.onload = () => {
+            const scale = Math.min(1, maxDimension / Math.max(img.width, img.height));
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.max(1, Math.round(img.width * scale));
+            canvas.height = Math.max(1, Math.round(img.height * scale));
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+              reject(new Error(`Failed to process ${file.name}`));
+              return;
+            }
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            resolve(canvas.toDataURL(file.type === 'image/png' ? 'image/png' : 'image/jpeg', quality));
+          };
+          img.onerror = () => reject(new Error(`Failed to read ${file.name}`));
+          img.src = sourceUrl;
+        });
+      }
+
+      const scale = Math.min(1, maxDimension / Math.max(width, height));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(width * scale));
+      canvas.height = Math.max(1, Math.round(height * scale));
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        throw new Error(`Failed to process ${file.name}`);
+      }
+
+      ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      bitmap.close?.();
+
+      return canvas.toDataURL(file.type === 'image/png' ? 'image/png' : 'image/jpeg', quality);
+    } finally {
+      URL.revokeObjectURL(sourceUrl);
+    }
+  }
 
   useEffect(() => {
     const savedConfig = sessionStorage.getItem(CONFIG_STORAGE_KEY);
@@ -388,17 +440,36 @@ export default function Home() {
 
     const readAsDataUrl = (file: File) =>
       new Promise<UploadedAsset>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => {
+        const finalize = (dataUrl: string, size: number) => {
           resolve({
             id: crypto.randomUUID(),
             name: file.name,
             type: file.type,
-            size: file.size,
-            dataUrl: String(reader.result || ''),
+            size,
+            dataUrl,
             addedAt: Date.now(),
           });
         };
+
+        if (file.type.startsWith('image/')) {
+          compressImageFile(file)
+            .then(dataUrl => finalize(dataUrl, file.size))
+            .catch(() => {
+              const reader = new FileReader();
+              reader.onload = () => finalize(String(reader.result || ''), file.size);
+              reader.onerror = () => reject(new Error(`Failed to read ${file.name}`));
+              reader.readAsDataURL(file);
+            });
+          return;
+        }
+
+        if ((file.type.startsWith('audio/') || file.type.startsWith('video/')) && file.size > MAX_NON_IMAGE_UPLOAD_BYTES) {
+          reject(new Error(`${file.name} is too large. Audio and video uploads must be 25 MB or smaller.`));
+          return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = () => finalize(String(reader.result || ''), file.size);
         reader.onerror = () => reject(new Error(`Failed to read ${file.name}`));
         reader.readAsDataURL(file);
       });
