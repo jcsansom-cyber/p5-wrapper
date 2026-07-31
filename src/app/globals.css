@@ -1,18 +1,18 @@
 ﻿:root {
-  --bg-primary: #0f0f14;
-  --bg-secondary: #1a1a24;
-  --bg-tertiary: #252533;
-  --bg-hover: #2d2d3f;
-  --text-primary: #e8e8f0;
-  --text-secondary: #9898a8;
-  --text-muted: #6b6b7d;
-  --accent-blue: #5c8df9;
-  --accent-purple: #9b6dff;
-  --accent-green: #4ade80;
-  --accent-orange: #fb923c;
-  --accent-red: #f87171;
-  --border-color: #2a2a3d;
-  --shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+  --bg-primary: #ffffff;
+  --bg-secondary: #f6f7fb;
+  --bg-tertiary: #edf1f7;
+  --bg-hover: #e6ebf4;
+  --text-primary: #1d2433;
+  --text-secondary: #4b5567;
+  --text-muted: #6d7588;
+  --accent-blue: #2563eb;
+  --accent-purple: #7c3aed;
+  --accent-green: #059669;
+  --accent-orange: #ea580c;
+  --accent-red: #dc2626;
+  --border-color: #d7ddeb;
+  --shadow: 0 8px 24px rgba(18, 28, 45, 0.08);
   --radius: 10px;
   --radius-sm: 6px;
 }
@@ -104,13 +104,13 @@ body {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+  background: linear-gradient(135deg, #3b82f6, #7c3aed);
   color: white;
 }
 
 .btn-primary:hover {
   transform: translateY(-1px);
-  box-shadow: 0 4px 16px rgba(92, 141, 249, 0.3);
+  box-shadow: 0 4px 16px rgba(37, 99, 235, 0.18);
 }
 
 .btn-secondary {
@@ -121,7 +121,7 @@ body {
 
 .btn-secondary:hover {
   background: var(--bg-hover);
-  border-color: var(--accent-blue);
+  border-color: #a9bddf;
 }
 
 .btn-danger {
@@ -164,7 +164,7 @@ body {
 
 .input:focus {
   border-color: var(--accent-blue);
-  box-shadow: 0 0 0 2px rgba(92, 141, 249, 0.15);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.12);
 }
 
 .input::placeholder {
@@ -188,11 +188,11 @@ body {
 
 .textarea:focus {
   border-color: var(--accent-blue);
-  box-shadow: 0 0 0 2px rgba(92, 141, 249, 0.15);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.12);
 }
 
 .code-block {
-  background: var(--bg-secondary);
+  background: #f8fafc;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
   padding: 16px;
@@ -215,22 +215,22 @@ body {
 }
 
 .badge-green {
-  background: rgba(74, 222, 128, 0.15);
+  background: rgba(5, 150, 105, 0.12);
   color: var(--accent-green);
 }
 
 .badge-blue {
-  background: rgba(92, 141, 249, 0.15);
+  background: rgba(37, 99, 235, 0.12);
   color: var(--accent-blue);
 }
 
 .badge-purple {
-  background: rgba(155, 109, 255, 0.15);
+  background: rgba(124, 58, 237, 0.12);
   color: var(--accent-purple);
 }
 
 .badge-orange {
-  background: rgba(251, 146, 60, 0.15);
+  background: rgba(234, 88, 12, 0.12);
   color: var(--accent-orange);
 }
 
@@ -245,7 +245,7 @@ body {
   left: 50%;
   transform: translateX(-50%);
   padding: 4px 8px;
-  background: var(--bg-primary);
+  background: #ffffff;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
   font-size: 11px;
@@ -263,8 +263,8 @@ body {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(4px);
+  background: rgba(226, 232, 240, 0.72);
+  backdrop-filter: blur(6px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -272,7 +272,7 @@ body {
 }
 
 .modal {
-  background: var(--bg-secondary);
+  background: #ffffff;
   border: 1px solid var(--border-color);
   border-radius: var(--radius);
   padding: 24px;
@@ -286,7 +286,7 @@ body {
 }
 
 .panel {
-  background: var(--bg-secondary);
+  background: #ffffff;
   border: 1px solid var(--border-color);
   border-radius: var(--radius);
   overflow: hidden;

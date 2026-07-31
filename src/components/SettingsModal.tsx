@@ -47,11 +47,11 @@ export default function SettingsModal({
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, overflowY: 'auto', paddingRight: 6, minHeight: 0, flex: 1 }}>
           <div>
-            <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: '#9898a8', marginBottom: 6 }}>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 6 }}>
               Saved Sketches
             </label>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 11, color: '#6b6b7d' }}>Load, delete, or import a downloaded sketch.</span>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Load, delete, or import a downloaded sketch.</span>
               <label className="btn btn-sm btn-secondary" style={{ cursor: 'pointer' }}>
                 Import Sketch
                 <input
@@ -72,20 +72,20 @@ export default function SettingsModal({
                 savedSketches.map(sketch => (
                   <div
                     key={sketch.id}
-                    style={{
-                      border: '1px solid var(--border-color)',
-                      borderRadius: 8,
-                      padding: 10,
-                      background: 'rgba(255,255,255,0.02)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 8,
+                      style={{
+                        border: '1px solid var(--border-color)',
+                        borderRadius: 8,
+                        padding: 10,
+                        background: 'var(--bg-secondary)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
                       justifyContent: 'space-between',
                     }}
                   >
                     <div style={{ minWidth: 0 }}>
                       <div style={{ fontSize: 12, fontWeight: 600, wordBreak: 'break-word' }}>{sketch.name}</div>
-                      <div style={{ fontSize: 10, color: '#6b6b7d' }}>Updated {new Date(sketch.updatedAt).toLocaleString()}</div>
+                      <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>Updated {new Date(sketch.updatedAt).toLocaleString()}</div>
                     </div>
                     <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
                       <button type="button" className="btn btn-sm btn-primary" onClick={() => onLoadSketch(sketch)}>
@@ -104,7 +104,7 @@ export default function SettingsModal({
           </div>
 
           <div>
-            <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: '#9898a8', marginBottom: 6 }}>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 6 }}>
               Claude API Key (Anthropic)
             </label>
             <input
@@ -114,11 +114,11 @@ export default function SettingsModal({
               value={config.anthropicKey}
               onChange={e => onConfigChange({ ...config, anthropicKey: e.target.value })}
             />
-            <p style={{ fontSize: 11, color: '#6b6b7d', marginTop: 4 }}>Stored only in your browser session.</p>
+            <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>Stored only in your browser session.</p>
           </div>
 
           <div>
-            <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: '#9898a8', marginBottom: 6 }}>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 6 }}>
               Claude Model ID
             </label>
             <input
@@ -140,13 +140,13 @@ export default function SettingsModal({
                 </button>
               ))}
             </div>
-            <p style={{ fontSize: 11, color: '#6b6b7d', marginTop: 4 }}>
+            <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
               Claude Haiku 4.5 is the default low-cost Anthropic option we support, and you can still paste a custom Claude model ID if needed.
             </p>
           </div>
 
           <div>
-            <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: '#9898a8', marginBottom: 6 }}>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 6 }}>
               GPT API Key (OpenAI)
             </label>
             <input
@@ -156,11 +156,11 @@ export default function SettingsModal({
               value={config.openaiKey}
               onChange={e => onConfigChange({ ...config, openaiKey: e.target.value })}
             />
-            <p style={{ fontSize: 11, color: '#6b6b7d', marginTop: 4 }}>Stored only in your browser session.</p>
+            <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>Stored only in your browser session.</p>
           </div>
 
           <div>
-            <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: '#9898a8', marginBottom: 6 }}>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 6 }}>
               GPT Model ID
             </label>
             <input
@@ -170,7 +170,7 @@ export default function SettingsModal({
               onChange={e => onConfigChange({ ...config, openaiModel: e.target.value })}
               placeholder="gpt-5-nano-2025-08-07"
             />
-            <p style={{ fontSize: 11, color: '#6b6b7d', marginTop: 4 }}>
+            <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
               GPT-4.1 nano is the lowest-cost OpenAI option we support here.
             </p>
             <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
@@ -188,7 +188,7 @@ export default function SettingsModal({
           </div>
 
           <div>
-            <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: '#9898a8', marginBottom: 6 }}>
+            <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 6 }}>
               System Prompt
             </label>
             <textarea
@@ -200,16 +200,16 @@ export default function SettingsModal({
             />
           </div>
 
-          <div
-            style={{
-              padding: 12,
-              background: 'rgba(74, 222, 128, 0.08)',
-              border: '1px solid rgba(74, 222, 128, 0.2)',
-              borderRadius: 6,
-            }}
-          >
-            <p style={{ fontSize: 12, color: '#4ade80', fontWeight: 500 }}>🔒 Privacy First</p>
-            <p style={{ fontSize: 11, color: '#9898a8', lineHeight: 1.5 }}>
+            <div
+              style={{
+                padding: 12,
+                background: 'rgba(5, 150, 105, 0.07)',
+                border: '1px solid rgba(5, 150, 105, 0.18)',
+                borderRadius: 6,
+              }}
+            >
+            <p style={{ fontSize: 12, color: 'var(--accent-green)', fontWeight: 500 }}>🔒 Privacy First</p>
+            <p style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
               API keys stay in browser session storage. Generated sketches and chat history can be saved locally in your
               browser, but nothing is written to the backend.
             </p>

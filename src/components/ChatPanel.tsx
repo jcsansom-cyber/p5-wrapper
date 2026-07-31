@@ -35,8 +35,8 @@ function renderMessageContent(content: string) {
           margin: '8px 0',
           padding: 10,
           borderRadius: 6,
-          background: 'rgba(15, 15, 20, 0.7)',
-          border: '1px solid rgba(255,255,255,0.08)',
+          background: '#f8fafc',
+          border: '1px solid var(--border-color)',
           overflowX: 'auto',
           whiteSpace: 'pre-wrap',
           fontSize: 12,
@@ -137,7 +137,7 @@ export default function ChatPanel({
         )}
       </div>
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 8, background: '#fff' }}>
         {messages.length === 0 && (
           <div style={{ textAlign: 'center', color: 'var(--text-muted)', paddingTop: 40 }}>
             <p style={{ fontSize: 28, marginBottom: 16 }}>🎨</p>

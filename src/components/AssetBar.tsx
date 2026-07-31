@@ -24,7 +24,7 @@ export default function AssetBar({ assets, onAddFiles, onRemoveAsset, onClearAss
       style={{
         padding: '10px 12px',
         borderBottom: '1px solid var(--border-color)',
-        background: 'linear-gradient(180deg, rgba(37, 37, 51, 0.9), rgba(26, 26, 36, 0.95))',
+        background: 'linear-gradient(180deg, #ffffff, #f6f7fb)',
         display: 'flex',
         flexDirection: 'column',
         gap: 10,
@@ -93,11 +93,11 @@ export default function AssetBar({ assets, onAddFiles, onRemoveAsset, onClearAss
                     height: 72,
                     borderRadius: 8,
                     overflow: 'hidden',
-                    background: 'rgba(255,255,255,0.03)',
+                    background: '#ffffff',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    border: '1px solid rgba(255,255,255,0.04)',
+                    border: '1px solid var(--border-color)',
                   }}
                 >
                   {isImage ? (

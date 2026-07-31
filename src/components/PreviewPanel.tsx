@@ -88,7 +88,7 @@ export default function PreviewPanel({ code, includeMl5, assets, htmlTemplate, o
           alignItems: 'center',
           gap: 6,
           padding: '8px 12px',
-          background: 'var(--bg-tertiary)',
+          background: 'var(--bg-secondary)',
           borderBottom: '1px solid var(--border-color)',
           flexWrap: 'wrap',
         }}
@@ -140,7 +140,7 @@ export default function PreviewPanel({ code, includeMl5, assets, htmlTemplate, o
         Include ml5.js for ML features
       </div>
 
-      <div style={{ flex: 1, overflow: 'hidden', background: '#0a0a0f' }}>
+      <div style={{ flex: 1, overflow: 'hidden', background: '#ffffff' }}>
         {code ? (
           <iframe
             ref={iframeRef}
