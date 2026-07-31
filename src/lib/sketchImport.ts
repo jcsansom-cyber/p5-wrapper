@@ -25,6 +25,20 @@ function extractFromScriptTag(text: string): string | null {
   return match[1].trim();
 }
 
+function looksLikeSketchCode(candidate: string): boolean {
+  if (!candidate) return false;
+
+  const normalized = candidate.toLowerCase();
+  return (
+    /function\s+setup\s*\(/.test(normalized) ||
+    /function\s+draw\s*\(/.test(normalized) ||
+    /createcanvas\s*\(/.test(normalized) ||
+    /createcapture\s*\(/.test(normalized) ||
+    /ml5\./.test(normalized) ||
+    /setup\(\)\s*\{/.test(normalized)
+  );
+}
+
 export function extractSketchFromImportedText(text: string): string {
   const trimmed = text.trim();
   if (!trimmed) return '';
@@ -38,9 +52,9 @@ export function extractSketchFromImportedText(text: string): string {
   const scriptTag = extractFromScriptTag(trimmed);
   if (scriptTag) return scriptTag.trim();
 
-  if (/function\s+setup\s*\(|class\s+\w+|createCanvas\s*\(/.test(trimmed)) {
+  if (looksLikeSketchCode(trimmed)) {
     return trimmed;
   }
 
-  return trimmed;
+  return '';
 }

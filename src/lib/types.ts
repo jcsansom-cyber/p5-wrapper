@@ -157,22 +157,27 @@ function draw() {
 }`;
 
 export function extractCodeBlock(text: string): string {
-  return extractFencedBlock(text, ['p5js', 'javascript', 'js']) || text.trim();
+  const fenced = extractFencedBlock(text, ['p5js', 'javascript', 'js']);
+  if (looksLikeSketchCode(fenced)) return fenced;
+
+  const unlabeled = extractFencedBlock(text, []);
+  if (looksLikeSketchCode(unlabeled)) return unlabeled;
+
+  const trimmed = text.trim();
+  if (looksLikeSketchCode(trimmed)) return trimmed;
+
+  return '';
 }
 
 export function extractHtmlTemplate(text: string): string {
-  const candidate = extractFencedBlock(text, ['html']) || text.trim();
+  const labeled = extractFencedBlock(text, ['html']);
+  if (looksLikeHtmlTemplate(labeled)) return labeled;
 
-  if (!candidate) return '';
+  const unlabeled = extractFencedBlock(text, []);
+  if (looksLikeHtmlTemplate(unlabeled)) return unlabeled;
 
-  const normalized = candidate.toLowerCase();
-  const looksLikeHtml =
-    normalized.includes('<!doctype html') ||
-    normalized.includes('<html') ||
-    normalized.includes('<head') ||
-    normalized.includes('<body');
-
-  return looksLikeHtml ? candidate : '';
+  const trimmed = text.trim();
+  return looksLikeHtmlTemplate(trimmed) ? trimmed : '';
 }
 
 export function extractFencedBlock(text: string, languages: string[]): string {
@@ -195,6 +200,35 @@ export function extractFencedBlock(text: string, languages: string[]): string {
   }
 
   return '';
+}
+
+function looksLikeSketchCode(candidate: string): boolean {
+  if (!candidate) return false;
+
+  const normalized = candidate.toLowerCase();
+  return (
+    /function\s+setup\s*\(/.test(normalized) ||
+    /function\s+draw\s*\(/.test(normalized) ||
+    /createcanvas\s*\(/.test(normalized) ||
+    /createcapture\s*\(/.test(normalized) ||
+    /new\s+ml5\./.test(normalized) ||
+    /ml5\./.test(normalized) ||
+    /setup\(\)\s*\{/.test(normalized)
+  );
+}
+
+function looksLikeHtmlTemplate(candidate: string): boolean {
+  if (!candidate) return false;
+
+  const normalized = candidate.toLowerCase();
+  return (
+    normalized.includes('<!doctype html') ||
+    normalized.includes('<html') ||
+    normalized.includes('<head') ||
+    normalized.includes('<body') ||
+    normalized.includes('<script id="p5-source"') ||
+    normalized.includes('{{sketch_source}}')
+  );
 }
 
 
