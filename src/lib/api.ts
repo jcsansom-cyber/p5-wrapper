@@ -179,7 +179,8 @@ export async function callOpenAI(
           content: normalizeOpenAIContent(message.content),
         })),
       ],
-      max_tokens: maxTokens,
+      // GPT-5-family Chat Completions models reject the legacy max_tokens field.
+      max_completion_tokens: maxTokens,
     }),
   });
 
