@@ -129,20 +129,19 @@ async function buildApiMessages(
     ]
     : [];
 
-  const latestImage = assets
+  const imageAssets = assets
     .filter(asset => asset.type.startsWith('image/'))
     .sort((a, b) => b.addedAt - a.addedAt)
-    .at(0);
+    .slice(0, 2);
 
-  const imageParts: PromptContentPart[] = latestImage
-    ? [
-        {
-          type: 'image' as const,
-          mediaType: latestImage.type || 'image/png',
-          dataUrl: await makeVisionThumbnail(latestImage.dataUrl, latestImage.type || 'image/png'),
-        },
-      ]
-    : [];
+  const imageParts: PromptContentPart[] = [];
+  for (const imageAsset of imageAssets) {
+    imageParts.push({
+      type: 'image' as const,
+      mediaType: imageAsset.type || 'image/png',
+      dataUrl: await makeVisionThumbnail(imageAsset.dataUrl, imageAsset.type || 'image/png'),
+    });
+  }
 
   const nextUserMessage: ProviderMessage =
     imageParts.length > 0

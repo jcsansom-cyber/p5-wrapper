@@ -106,6 +106,8 @@ Rules:
 - For live webcam tracking models such as FaceMesh, BodyPose, and HandPose, use createCapture(VIDEO), hide the video element, and call detectStart(video, callback) in the p5.js 1.x style.
 - For FaceMesh specifically, default to \`faceMesh = ml5.faceMesh({ maxFaces: 1, flipped: true })\` in \`preload()\`, create the webcam with \`video = createCapture(VIDEO)\` or \`createCapture(VIDEO, { flipped: true })\`, hide it, and then call \`faceMesh.detectStart(video, callback)\` in \`setup()\`. Keep the model setup simple and do not wait on a manual loading callback.
 - For BodyPose specifically, default to \`ml5.bodyPose("MoveNet", { flipped: true })\` in \`preload()\` and then call \`detectStart(video, callback)\` in \`setup()\`. If the sketch needs BlazePose instead, choose it explicitly and keep the camera mirrored.
+- Do not use the newer async constructor pattern in this app; the runtime is p5.js 1.x style, so stick to preload/setup plus detectStart.
+- When a sketch needs webcam input, request it immediately by creating the capture in setup and hiding it. Do not wait for a button click or a separate loading callback.
 - If the sketch uses image classification or Teachable Machine, use the appropriate ml5 classifier API and keep the model and sketch logic separated.
 - Do not use the old ml5.faceApi API.
 - If the sketch needs the camera, make it interactive and explain that it requires HTTPS or localhost.
@@ -267,10 +269,12 @@ export function buildAssetContext(assets: UploadedAsset[]): string {
     .map(asset => `- ${asset.name} (${asset.type || 'unknown type'})`)
     .join('\n');
 
-  const hasImages = assets.some(asset => asset.type.startsWith('image/'));
+  const imageAssets = assets.filter(asset => asset.type.startsWith('image/'));
   const hasLocalOnlyMedia = assets.some(asset => asset.type.startsWith('audio/') || asset.type.startsWith('video/'));
+  const imageNames = imageAssets.map(asset => `- ${asset.name}`).join('\n');
+  const mostRecentImage = imageAssets.slice().sort((a, b) => b.addedAt - a.addedAt)[0];
 
-  return `\n\nUploaded assets available to the sketch:\n${lines}\n\nUse p5AssetURL("filename") to load an uploaded asset by name. For example: loadImage(p5AssetURL("image.png")) or loadSound(p5AssetURL("music.mp3")). Text files, JSON, and other assets are also available as data URLs.${hasImages ? '\nIf the user uploaded a photo or image, inspect it directly and use it as visual context for the request.' : ''}${hasLocalOnlyMedia ? '\nAudio and video uploads stay local to the browser and are not attached to the AI request as media input.' : ''}`;
+  return `\n\nUploaded assets available to the sketch:\n${lines}\n\nExact image filenames available:\n${imageNames || '- None'}\n\nUse p5AssetURL("exact-file-name") to load an uploaded asset by exact name. Example: \`loadImage(p5AssetURL("image.png"))\` or \`loadSound(p5AssetURL("music.mp3"))\`. Do not invent filenames or ask the user to rename files. If the user asks you to use an uploaded image, prefer the most recent uploaded image asset${mostRecentImage ? `: \`${mostRecentImage.name}\`` : ''}. Text files, JSON, and other assets are also available as data URLs.${imageAssets.length ? '\nIf the user uploaded a photo or image, inspect it directly and use it as visual context for the request.' : ''}${hasLocalOnlyMedia ? '\nAudio and video uploads stay local to the browser and are not attached to the AI request as media input.' : ''}`;
 }
 
 export function buildAssetRegistryScript(assets: UploadedAsset[]): string {
@@ -322,6 +326,7 @@ export function buildHtmlFromTemplate(
   };
   const runtimeScript = `<script>
     const sketch = document.getElementById('p5-source')?.textContent || '';
+    const sketchLower = sketch.toLowerCase();
     const errorBox = document.createElement('pre');
     errorBox.id = 'p5-error';
     errorBox.style.cssText = 'display:none;position:fixed;left:12px;right:12px;bottom:12px;padding:12px;border-radius:8px;background:rgba(248,113,113,0.12);color:#fda4af;font-family:monospace;font-size:12px;white-space:pre-wrap;border:1px solid rgba(248,113,113,0.24);z-index:9999;';
@@ -347,6 +352,19 @@ export function buildHtmlFromTemplate(
         window.parent?.postMessage({ type: 'p5-exit-fullscreen' }, '*');
       }
     });
+
+    const needsWebcamBootstrap =
+      /facemesh|bodypose|handpose/.test(sketchLower) && !/createcapture\s*\(/.test(sketchLower);
+
+    if (needsWebcamBootstrap) {
+      try {
+        const bootstrapVideo = createCapture(VIDEO);
+        bootstrapVideo.hide();
+        window.__P5_BOOTSTRAP_VIDEO__ = bootstrapVideo;
+      } catch (error) {
+        reportError(error && error.message ? error.message : String(error));
+      }
+    }
 
     try {
       window.eval(sketch);
