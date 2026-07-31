@@ -14,6 +14,7 @@ import {
   type ChatMessage,
   type Provider,
   type ProviderMessage,
+  type PromptContentPart,
   type SavedSketch,
   type UploadedAsset,
   buildAssetContext,
@@ -75,7 +76,12 @@ function composeSystemPrompt(basePrompt: string, includeMl5: boolean, sketchCont
   return prompt;
 }
 
-function buildApiMessages(currentCode: string, previousMessages: ChatMessage[], nextMessage: string): ProviderMessage[] {
+function buildApiMessages(
+  currentCode: string,
+  previousMessages: ChatMessage[],
+  nextMessage: string,
+  assets: UploadedAsset[]
+): ProviderMessage[] {
   const history: ProviderMessage[] = previousMessages.slice(-8).map(message => ({
     role: message.role,
     content: message.content,
@@ -86,11 +92,30 @@ function buildApiMessages(currentCode: string, previousMessages: ChatMessage[], 
         {
           role: 'user' as const,
           content: `Here is the current p5.js sketch:\n\n\`\`\`javascript\n${currentCode.trim()}\n\`\`\``,
-        },
-      ]
+      },
+    ]
     : [];
 
-  return [...sketchContext, ...history, { role: 'user', content: nextMessage }];
+  const imageParts: PromptContentPart[] = assets
+    .filter(asset => asset.type.startsWith('image/'))
+    .map(asset => ({
+      type: 'image' as const,
+      mediaType: asset.type || 'image/png',
+      dataUrl: asset.dataUrl,
+    }));
+
+  const nextUserMessage: ProviderMessage =
+    imageParts.length > 0
+      ? {
+          role: 'user',
+          content: [
+            { type: 'text', text: nextMessage },
+            ...imageParts,
+          ],
+        }
+      : { role: 'user', content: nextMessage };
+
+  return [...sketchContext, ...history, nextUserMessage];
 }
 
 export default function Home() {
@@ -253,7 +278,7 @@ export default function Home() {
       setIsLoading(true);
 
       const systemPrompt = composeSystemPrompt(config.systemPrompt, includeMl5, currentCode, buildAssetContext(assets));
-      const apiMessages = buildApiMessages(currentCode, messages, content);
+      const apiMessages = buildApiMessages(currentCode, messages, content, assets);
 
       try {
         const response = await fetch('/api/generate', {
@@ -301,6 +326,7 @@ export default function Home() {
         if (htmlTemplateCandidate) {
           setHtmlTemplate(htmlTemplateCandidate);
           setDrawerOpen(true);
+          setWorkspaceTab('html');
           setSessionCount(prev => prev + 1);
         }
 
@@ -323,7 +349,7 @@ export default function Home() {
         setIsLoading(false);
       }
     },
-    [providerKey, isLoading, messages, activeProvider, config.systemPrompt, anthropicModel, openaiModel, includeMl5, currentCode]
+    [providerKey, isLoading, messages, activeProvider, config.systemPrompt, anthropicModel, openaiModel, includeMl5, currentCode, assets]
   );
 
   const handleCodeChange = useCallback((newCode: string) => {

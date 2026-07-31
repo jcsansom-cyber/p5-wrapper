@@ -1,4 +1,4 @@
-import type { ProviderMessage } from './types';
+import type { PromptContentPart, ProviderMessage } from './types';
 
 interface AnthropicResponse {
   content?: Array<{ type?: string; text?: string }>;
@@ -38,8 +38,67 @@ function isAnthropicModelNotFound(errorText: string, model: string): boolean {
 function normalizeAnthropicMessages(messages: ProviderMessage[]) {
   return messages.map(message => ({
     role: message.role,
-    content: [{ type: 'text', text: message.content }],
+    content: normalizeAnthropicContent(message.content),
   }));
+}
+
+function normalizeAnthropicContent(content: ProviderMessage['content']) {
+  if (typeof content === 'string') {
+    return [{ type: 'text', text: content }];
+  }
+
+  const normalized: Array<
+    | { type: 'text'; text: string }
+    | {
+        type: 'image';
+        source: {
+          type: 'base64';
+          media_type: string;
+          data: string;
+        };
+      }
+  > = [];
+
+  for (const part of content) {
+    if (part.type === 'text') {
+      normalized.push({ type: 'text', text: part.text });
+      continue;
+    }
+
+    const [prefix, base64 = ''] = part.dataUrl.split(',');
+    const mediaTypeMatch = prefix.match(/^data:([^;]+);base64$/i);
+    const mediaType = mediaTypeMatch?.[1] || part.mediaType || 'image/png';
+
+    normalized.push({
+      type: 'image',
+      source: {
+        type: 'base64',
+        media_type: mediaType,
+        data: base64,
+      },
+    });
+  }
+
+  return normalized;
+}
+
+function normalizeOpenAIContent(content: ProviderMessage['content']) {
+  if (typeof content === 'string') {
+    return content;
+  }
+
+  return content.map(part => {
+    if (part.type === 'text') {
+      return { type: 'text', text: part.text };
+    }
+
+    return {
+      type: 'image_url',
+      image_url: {
+        url: part.dataUrl,
+      },
+    };
+  });
 }
 
 export async function callAnthropic(
@@ -116,7 +175,10 @@ export async function callOpenAI(
       model,
       messages: [
         { role: 'system', content: systemPrompt },
-        ...messages,
+        ...messages.map(message => ({
+          role: message.role,
+          content: normalizeOpenAIContent(message.content),
+        })),
       ],
       max_tokens: maxTokens,
     }),

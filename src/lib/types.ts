@@ -17,8 +17,23 @@ export interface ChatMessage {
 
 export interface ProviderMessage {
   role: 'user' | 'assistant';
-  content: string;
+  content: ProviderMessageContent;
 }
+
+export interface PromptTextPart {
+  type: 'text';
+  text: string;
+}
+
+export interface PromptImagePart {
+  type: 'image';
+  mediaType: string;
+  dataUrl: string;
+}
+
+export type PromptContentPart = PromptTextPart | PromptImagePart;
+
+export type ProviderMessageContent = string | PromptContentPart[];
 
 export interface GenerateRequestBody {
   provider: Provider;
@@ -202,7 +217,9 @@ export function buildAssetContext(assets: UploadedAsset[]): string {
     .map(asset => `- ${asset.name} (${asset.type || 'unknown type'})`)
     .join('\n');
 
-  return `\n\nUploaded assets available to the sketch:\n${lines}\n\nUse p5AssetURL("filename") to load an uploaded asset by name. For example: loadImage(p5AssetURL("image.png")) or loadSound(p5AssetURL("music.mp3")). Text files, JSON, and other assets are also available as data URLs.`;
+  const hasImages = assets.some(asset => asset.type.startsWith('image/'));
+
+  return `\n\nUploaded assets available to the sketch:\n${lines}\n\nUse p5AssetURL("filename") to load an uploaded asset by name. For example: loadImage(p5AssetURL("image.png")) or loadSound(p5AssetURL("music.mp3")). Text files, JSON, and other assets are also available as data URLs.${hasImages ? '\nIf the user uploaded a photo or image, inspect it directly and use it as visual context for the request.' : ''}`;
 }
 
 export function buildAssetRegistryScript(assets: UploadedAsset[]): string {
