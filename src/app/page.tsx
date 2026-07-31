@@ -21,6 +21,7 @@ import {
   extractFencedBlock,
   extractHtmlTemplate,
   normalizeAnthropicModel,
+  usesMl5Features,
 } from '../lib/types';
 import { extractCodeBlock } from '../lib/types';
 import { clearAssets as clearStoredAssets, loadAssets, saveAssets } from '../lib/assetStore';
@@ -349,6 +350,8 @@ export default function Home() {
   const hasApiKey = Boolean(providerKey);
   const anthropicModel = normalizeAnthropicModel(config.anthropicModel);
   const openaiModel = config.openaiModel.trim() || DEFAULT_CONFIG.openaiModel;
+  const sketchUsesMl5 = usesMl5Features(currentCode);
+  const effectiveIncludeMl5 = includeMl5 || sketchUsesMl5;
 
   const sendMessage = useCallback(
     async (content: string) => {
@@ -365,7 +368,7 @@ export default function Home() {
       setMessages(nextMessages);
       setIsLoading(true);
 
-      const systemPrompt = composeSystemPrompt(config.systemPrompt, includeMl5, currentCode, buildAssetContext(assets));
+      const systemPrompt = composeSystemPrompt(config.systemPrompt, effectiveIncludeMl5, currentCode, buildAssetContext(assets));
       const apiMessages = await buildApiMessages(currentCode, messages, content, assets);
 
       try {
@@ -754,11 +757,11 @@ export default function Home() {
                   borderRight: layout === 'split' ? '1px solid var(--border-color)' : 'none',
                 }}
               >
-                <CodePanel
+              <CodePanel
                   code={currentCode}
                   assets={assets}
                   htmlTemplate={htmlTemplate}
-                  includeMl5={includeMl5}
+                  includeMl5={effectiveIncludeMl5}
                   onCodeChange={handleCodeChange}
                   onSaveSketch={handleSaveSketch}
                 />
@@ -783,7 +786,7 @@ export default function Home() {
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
                 <PreviewPanel
                   code={currentCode}
-                  includeMl5={includeMl5}
+                  includeMl5={effectiveIncludeMl5}
                   assets={assets}
                   htmlTemplate={htmlTemplate}
                   onToggleMl5={setIncludeMl5}

@@ -104,8 +104,8 @@ Rules:
 - Write code that runs directly in the browser with p5.js.
 - If the user asks for ml5.js features, include the ml5.js CDN script and use it correctly.
 - For live webcam tracking models such as FaceMesh, BodyPose, and HandPose, use createCapture(VIDEO), hide the video element, and call detectStart(video, callback) in the p5.js 1.x style.
-- For FaceMesh specifically, default to \`faceMesh = ml5.faceMesh({ flipped: true })\` in \`preload()\` and then \`faceMesh.detectStart(video, callback)\` in \`setup()\`. Mirror the camera with \`createCapture(VIDEO, { flipped: true })\` or an equivalent setup so face tracking feels natural.
-- For BodyPose specifically, default to \`ml5.bodyPose("MoveNet", { flipped: true })\` in \`preload()\` and then call \`detectStart(video, callback)\` in \`setup()\`. If the sketch needs BlazePose instead, choose it explicitly and keep the video mirrored with \`flipped: true\`.
+- For FaceMesh specifically, default to \`faceMesh = ml5.faceMesh({ maxFaces: 1, flipped: true })\` in \`preload()\`, create the webcam with \`video = createCapture(VIDEO)\` or \`createCapture(VIDEO, { flipped: true })\`, hide it, and then call \`faceMesh.detectStart(video, callback)\` in \`setup()\`. Keep the model setup simple and do not wait on a manual loading callback.
+- For BodyPose specifically, default to \`ml5.bodyPose("MoveNet", { flipped: true })\` in \`preload()\` and then call \`detectStart(video, callback)\` in \`setup()\`. If the sketch needs BlazePose instead, choose it explicitly and keep the camera mirrored.
 - If the sketch uses image classification or Teachable Machine, use the appropriate ml5 classifier API and keep the model and sketch logic separated.
 - Do not use the old ml5.faceApi API.
 - If the sketch needs the camera, make it interactive and explain that it requires HTTPS or localhost.
@@ -182,6 +182,20 @@ export function extractHtmlTemplate(text: string): string {
   return looksLikeHtmlTemplate(trimmed) ? trimmed : '';
 }
 
+export function usesMl5Features(text: string): boolean {
+  const normalized = text.toLowerCase();
+  return (
+    normalized.includes('ml5.') ||
+    normalized.includes('facemesh') ||
+    normalized.includes('bodypose') ||
+    normalized.includes('handpose') ||
+    normalized.includes('imageclassifier') ||
+    normalized.includes('soundclassifier') ||
+    normalized.includes('teachable machine') ||
+    normalized.includes('mobilenet')
+  );
+}
+
 export function extractFencedBlock(text: string, languages: string[]): string {
   const fencedBlockRegex = /```([^\n`]*)\n([\s\S]*?)```/g;
   let match: RegExpExecArray | null;
@@ -236,7 +250,7 @@ function looksLikeHtmlTemplate(candidate: string): boolean {
 
 export function buildSystemPrompt(options?: { includeMl5?: boolean; sketchContext?: string }): string {
   const ml5Note = options?.includeMl5
-    ? `\n- Include ml5.js when the sketch needs machine learning features.\n- Use this CDN script when needed: <script src="https://unpkg.com/ml5@1/dist/ml5.min.js"></script>\n- For webcam models such as FaceMesh, BodyPose, and HandPose, use createCapture(VIDEO), hide the video element, and call detectStart(video, callback).\n- For FaceMesh, default to \`faceMesh = ml5.faceMesh({ flipped: true })\` in \`preload()\` and \`faceMesh.detectStart(video, callback)\` in \`setup()\`. Mirror the camera with \`createCapture(VIDEO, { flipped: true })\`.\n- For BodyPose, default to \`ml5.bodyPose("MoveNet", { flipped: true })\` in \`preload()\` and \`detectStart(video, callback)\` in \`setup()\`. If the user asks for BlazePose, choose it explicitly and mirror the camera with \`flipped: true\`.\n- For image classification or Teachable Machine, choose the matching classifier API and keep the model and sketch logic separate from the HTML wrapper.`
+    ? `\n- Include ml5.js when the sketch needs machine learning features.\n- Use this CDN script when needed: <script src="https://unpkg.com/ml5@1/dist/ml5.min.js"></script>\n- For webcam models such as FaceMesh, BodyPose, and HandPose, use createCapture(VIDEO), hide the video element, and call detectStart(video, callback).\n- For FaceMesh, default to \`faceMesh = ml5.faceMesh({ maxFaces: 1, flipped: true })\` in \`preload()\`, create the webcam with \`video = createCapture(VIDEO)\` or \`createCapture(VIDEO, { flipped: true })\`, hide it, and call \`faceMesh.detectStart(video, callback)\` in \`setup()\`.\n- For BodyPose, default to \`ml5.bodyPose("MoveNet", { flipped: true })\` in \`preload()\` and \`detectStart(video, callback)\` in \`setup()\`. If the user asks for BlazePose, choose it explicitly and keep the camera mirrored.\n- For image classification or Teachable Machine, choose the matching classifier API and keep the model and sketch logic separate from the HTML wrapper.`
     : '';
 
   const sketchContext = options?.sketchContext?.trim()
