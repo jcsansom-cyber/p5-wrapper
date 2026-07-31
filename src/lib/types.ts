@@ -202,7 +202,7 @@ export function buildAssetContext(assets: UploadedAsset[]): string {
     .map(asset => `- ${asset.name} (${asset.type || 'unknown type'})`)
     .join('\n');
 
-  return `\n\nUploaded assets available to the sketch:\n${lines}\n\nUse p5AssetURL("filename") to load an uploaded asset by name. For example: loadImage(p5AssetURL("image.png")) or loadSound(p5AssetURL("music.mp3")).`;
+  return `\n\nUploaded assets available to the sketch:\n${lines}\n\nUse p5AssetURL("filename") to load an uploaded asset by name. For example: loadImage(p5AssetURL("image.png")) or loadSound(p5AssetURL("music.mp3")). Text files, JSON, and other assets are also available as data URLs.`;
 }
 
 export function buildAssetRegistryScript(assets: UploadedAsset[]): string {

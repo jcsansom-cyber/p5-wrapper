@@ -33,7 +33,7 @@ export default function AssetBar({ assets, onAddFiles, onRemoveAsset, onClearAss
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         <strong style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Assets</strong>
         <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-          Upload images, audio, or other files and reference them with <code>p5AssetURL("name")</code>
+          Upload any file and reference it with <code>p5AssetURL("name")</code>
         </span>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           <button
@@ -54,11 +54,11 @@ export default function AssetBar({ assets, onAddFiles, onRemoveAsset, onClearAss
         </div>
       </div>
 
-      <input
+        <input
         ref={inputRef}
         type="file"
         multiple
-        accept="image/*,audio/*"
+        accept="*/*"
         style={{ display: 'none' }}
         onChange={e => {
           if (e.target.files?.length) {
@@ -137,7 +137,7 @@ export default function AssetBar({ assets, onAddFiles, onRemoveAsset, onClearAss
         </div>
       ) : (
         <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-          No assets yet. Drop in an image or audio file to make it available to your sketch.
+          No assets yet. Drop in any file to make it available to your sketch.
         </div>
       )}
     </div>

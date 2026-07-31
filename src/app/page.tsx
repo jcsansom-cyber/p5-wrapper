@@ -357,7 +357,7 @@ export default function Home() {
   }, []);
 
   const handleAddFiles = useCallback(async (fileList: FileList | File[]) => {
-    const files = Array.from(fileList).filter(file => file.type.startsWith('image/') || file.type.startsWith('audio/'));
+    const files = Array.from(fileList);
     if (files.length === 0) return;
 
     const readAsDataUrl = (file: File) =>

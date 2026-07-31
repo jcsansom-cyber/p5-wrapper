@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import type { UploadedAsset } from '../lib/types';
 
 interface WorkspaceDrawerProps {
@@ -35,7 +35,22 @@ export default function WorkspaceDrawer({
   onHtmlTemplateChange,
 }: WorkspaceDrawerProps) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const [isDropActive, setIsDropActive] = useState(false);
   const drawerWidth = 680;
+
+  function handleFiles(fileList: FileList | File[]) {
+    onAddFiles(fileList);
+  }
+
+  function handleDrop(event: React.DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    setIsDropActive(false);
+
+    const files = event.dataTransfer.files;
+    if (files?.length) {
+      handleFiles(files);
+    }
+  }
 
   return (
     <>
@@ -98,10 +113,25 @@ export default function WorkspaceDrawer({
         </div>
 
         {activeTab === 'files' ? (
-          <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 10, minHeight: 0, overflow: 'hidden' }}>
+          <div
+            style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 10, minHeight: 0, overflow: 'hidden' }}
+            onDragOver={event => {
+              event.preventDefault();
+              setIsDropActive(true);
+            }}
+            onDragEnter={event => {
+              event.preventDefault();
+              setIsDropActive(true);
+            }}
+            onDragLeave={event => {
+              if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+              setIsDropActive(false);
+            }}
+            onDrop={handleDrop}
+          >
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <strong style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Files</strong>
-              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Add images and audio for p5AssetURL()</span>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Add any file for p5AssetURL()</span>
               <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
                 <button type="button" className="btn btn-sm btn-secondary" onClick={() => inputRef.current?.click()}>
                   Add Files
@@ -116,7 +146,7 @@ export default function WorkspaceDrawer({
               ref={inputRef}
               type="file"
               multiple
-              accept="image/*,audio/*"
+              accept="*/*"
               style={{ display: 'none' }}
               onChange={e => {
                 if (e.target.files?.length) {
@@ -125,6 +155,32 @@ export default function WorkspaceDrawer({
                 }
               }}
             />
+
+            <button
+              type="button"
+              onClick={() => inputRef.current?.click()}
+              onKeyDown={event => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  inputRef.current?.click();
+                }
+              }}
+              style={{
+                border: `1px dashed ${isDropActive ? 'var(--accent-blue)' : 'var(--border-color)'}`,
+                borderRadius: 12,
+                background: isDropActive ? 'rgba(92, 141, 249, 0.12)' : 'rgba(255,255,255,0.02)',
+                color: 'var(--text-primary)',
+                padding: '14px 12px',
+                textAlign: 'left',
+                cursor: 'pointer',
+                transition: 'border-color 0.15s ease, background 0.15s ease',
+              }}
+            >
+              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>Drop files here or click Add Files</div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                Images will show a preview. Other files are still stored and can be referenced by name.
+              </div>
+            </button>
 
             <div style={{ overflowY: 'auto', display: 'grid', gridTemplateColumns: '1fr', gap: 8, minHeight: 0 }}>
               {assets.length > 0 ? (
