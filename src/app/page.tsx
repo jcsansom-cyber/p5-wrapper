@@ -77,46 +77,82 @@ function composeSystemPrompt(basePrompt: string, includeMl5: boolean, sketchCont
   return prompt;
 }
 
-function buildApiMessages(
+function truncateText(value: string, maxLength: number): string {
+  const trimmed = value.trim();
+  if (trimmed.length <= maxLength) return trimmed;
+  return `${trimmed.slice(0, maxLength).trimEnd()}\n\n[trimmed]`;
+}
+
+async function makeVisionThumbnail(dataUrl: string, mimeType: string): Promise<string> {
+  const maxDimension = 384;
+  const quality = 0.6;
+
+  const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error('Failed to prepare image preview'));
+    img.src = dataUrl;
+  });
+
+  const scale = Math.min(1, maxDimension / Math.max(image.width, image.height));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(image.width * scale));
+  canvas.height = Math.max(1, Math.round(image.height * scale));
+
+  const ctx = canvas.getContext('2d');
+  if (!ctx) {
+    throw new Error('Failed to prepare image preview');
+  }
+
+  ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL(mimeType === 'image/png' ? 'image/png' : 'image/jpeg', quality);
+}
+
+async function buildApiMessages(
   currentCode: string,
   previousMessages: ChatMessage[],
   nextMessage: string,
   assets: UploadedAsset[]
-): ProviderMessage[] {
-  const history: ProviderMessage[] = previousMessages.slice(-8).map(message => ({
+): Promise<ProviderMessage[]> {
+  const history: ProviderMessage[] = previousMessages.slice(-6).map(message => ({
     role: message.role,
-    content: message.content,
+    content: truncateText(message.content, 4000),
   }));
 
   const sketchContext = currentCode.trim()
     ? [
         {
           role: 'user' as const,
-          content: `Here is the current p5.js sketch:\n\n\`\`\`javascript\n${currentCode.trim()}\n\`\`\``,
+          content: `Here is the current p5.js sketch:\n\n\`\`\`javascript\n${truncateText(currentCode.trim(), 12000)}\n\`\`\``,
       },
     ]
     : [];
 
-  const imageParts: PromptContentPart[] = assets
+  const latestImage = assets
     .filter(asset => asset.type.startsWith('image/'))
     .sort((a, b) => b.addedAt - a.addedAt)
-    .slice(0, 1)
-    .map(asset => ({
-      type: 'image' as const,
-      mediaType: asset.type || 'image/png',
-      dataUrl: asset.dataUrl,
-    }));
+    .at(0);
+
+  const imageParts: PromptContentPart[] = latestImage
+    ? [
+        {
+          type: 'image' as const,
+          mediaType: latestImage.type || 'image/png',
+          dataUrl: await makeVisionThumbnail(latestImage.dataUrl, latestImage.type || 'image/png'),
+        },
+      ]
+    : [];
 
   const nextUserMessage: ProviderMessage =
     imageParts.length > 0
       ? {
           role: 'user',
           content: [
-            { type: 'text', text: nextMessage },
+            { type: 'text', text: truncateText(nextMessage, 2000) },
             ...imageParts,
           ],
         }
-      : { role: 'user', content: nextMessage };
+      : { role: 'user', content: truncateText(nextMessage, 2000) };
 
   return [...sketchContext, ...history, nextUserMessage];
 }
@@ -330,7 +366,7 @@ export default function Home() {
       setIsLoading(true);
 
       const systemPrompt = composeSystemPrompt(config.systemPrompt, includeMl5, currentCode, buildAssetContext(assets));
-      const apiMessages = buildApiMessages(currentCode, messages, content, assets);
+      const apiMessages = await buildApiMessages(currentCode, messages, content, assets);
 
       try {
         const response = await fetch('/api/generate', {
