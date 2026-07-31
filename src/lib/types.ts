@@ -68,10 +68,8 @@ export const DEFAULT_HTML_TEMPLATE = `<!DOCTYPE html>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Permissions-Policy" content="camera=(self), microphone=(self), autoplay=(self), fullscreen=(self)">
   <title>p5.js Sketch</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/addons/p5.dom.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/addons/p5.sound.min.js"></script>
-  <script src="https://unpkg.com/ml5@1/dist/ml5.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.11.10/p5.js"></script>
+  <script src="https://unpkg.com/ml5@1/dist/ml5.js"></script>
   <style>
     html, body {
       margin: 0;
@@ -107,9 +105,11 @@ Rules:
 - For FaceMesh, mirror the p5 editor example exactly: \`faceMesh = ml5.faceMesh({ maxFaces: 1, flipped: true })\` in \`preload()\`, \`video = createCapture(VIDEO, { flipped: true })\` or \`video = createCapture(VIDEO)\` plus canvas mirroring, then \`faceMesh.detectStart(video, gotFaces)\` in \`setup()\`.
 - For BodyPose, mirror the p5 editor example exactly: \`bodyPose = ml5.bodyPose()\` in \`preload()\`, \`video = createCapture(VIDEO)\`, then \`bodyPose.detectStart(video, gotPoses)\` in \`setup()\`.
 - For HandPose, mirror the p5 editor example exactly: \`handPose = ml5.handPose()\` in \`preload()\`, \`video = createCapture(VIDEO)\`, then \`handPose.detectStart(video, gotHands)\` in \`setup()\`.
-- Never use \`ml5.handPose({ flipped: true })\`, \`ml5.bodyPose("...")\`, or any older async constructor pattern for these webcam trackers.
+- Do not add model options unless needed. \`ml5.handPose({ flipped: true })\` is valid with ml5 1.x when mirrored landmark coordinates are required, but \`ml5.handPose()\` is the safe default.
 - Do not use the older async constructor pattern in this app; the runtime is p5.js 1.x style, so stick to preload/setup plus detectStart.
 - When a sketch needs webcam input, request it immediately by creating the capture in setup and hiding it. Do not wait for a button click or a separate loading callback.
+- For HandPose results, use \`hands[0].keypoints[8]\` for the index-finger tip. Do not invent fields such as \`index_finger_tip\`.
+- Do not include script tags in a JavaScript response. The workspace loads exactly one compatible copy of p5.js and ml5.js.
 - If the sketch uses image classification or Teachable Machine, use the appropriate ml5 classifier API and keep the model and sketch logic separated.
 - If the user uploaded an image and wants it used in the sketch, load it from the local asset registry with \`p5AssetURL("exact-file-name")\` and \`loadImage(...)\`. Do not invent remote URLs like Wikimedia, Unsplash, or placeholder image links.
 - Do not use the old ml5.faceApi API.
@@ -256,7 +256,7 @@ function looksLikeHtmlTemplate(candidate: string): boolean {
 
 export function buildSystemPrompt(options?: { includeMl5?: boolean; sketchContext?: string }): string {
   const ml5Note = options?.includeMl5
-    ? `\n- Include ml5.js when the sketch needs machine learning features.\n- Use this CDN script when needed: <script src="https://unpkg.com/ml5@1/dist/ml5.min.js"></script>\n- For webcam models such as FaceMesh, BodyPose, and HandPose, use createCapture(VIDEO), hide the video element, and call detectStart(video, callback).\n- For FaceMesh, initialize with \`faceMesh = ml5.faceMesh({ maxFaces: 1, flipped: true })\` in \`preload()\`, create the webcam with \`video = createCapture(VIDEO, { flipped: true })\` or \`video = createCapture(VIDEO)\` plus canvas mirroring, hide it, and call \`faceMesh.detectStart(video, gotFaces)\` in \`setup()\`.\n- For BodyPose, initialize with \`bodyPose = ml5.bodyPose()\` in \`preload()\`, create the webcam with \`video = createCapture(VIDEO)\`, hide it, and call \`bodyPose.detectStart(video, gotPoses)\` in \`setup()\`.\n- For HandPose, initialize with \`handPose = ml5.handPose()\` in \`preload()\`, create the webcam with \`video = createCapture(VIDEO)\`, hide it, and call \`handPose.detectStart(video, gotHands)\` in \`setup()\`.\n- For image classification or Teachable Machine, choose the matching classifier API and keep the model and sketch logic separate from the HTML wrapper.`
+    ? `\n- The workspace already loads one compatible p5.js and ml5.js pair. Return sketch JavaScript only; do not add script tags.\n- For webcam models such as FaceMesh, BodyPose, and HandPose, use createCapture(VIDEO), hide the video element, and call detectStart(video, callback).\n- For FaceMesh, initialize with \`faceMesh = ml5.faceMesh({ maxFaces: 1, flipped: true })\` in \`preload()\`, create the webcam with \`video = createCapture(VIDEO, { flipped: true })\` or \`video = createCapture(VIDEO)\` plus canvas mirroring, hide it, and call \`faceMesh.detectStart(video, gotFaces)\` in \`setup()\`.\n- For BodyPose, initialize with \`bodyPose = ml5.bodyPose()\` in \`preload()\`, create the webcam with \`video = createCapture(VIDEO)\`, hide it, and call \`bodyPose.detectStart(video, gotPoses)\` in \`setup()\`.\n- For HandPose, initialize with \`handPose = ml5.handPose()\` in \`preload()\`, create the webcam with \`video = createCapture(VIDEO)\`, hide it, and call \`handPose.detectStart(video, gotHands)\`; the index-finger tip is \`hands[0].keypoints[8]\`.\n- For image classification or Teachable Machine, choose the matching classifier API and keep the model and sketch logic separate from the HTML wrapper.`
     : '';
 
   const sketchContext = options?.sketchContext?.trim()
@@ -312,21 +312,20 @@ export function buildHtmlFromTemplate(
   options: { sketchSource: string; assets: UploadedAsset[]; includeMl5?: boolean }
 ): string {
   const assetScript = buildAssetRegistryScript(options.assets);
-  const ml5ScriptTag = '<script src="https://unpkg.com/ml5@1/dist/ml5.min.js"></script>';
-  const injectMl5Script = (html: string): string => {
-    if (options.includeMl5 === false) {
-      return html.replaceAll(ml5ScriptTag, '');
+  const p5ScriptTag = '<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.11.10/p5.js"></script>';
+  const ml5ScriptTag = '<script src="https://unpkg.com/ml5@1/dist/ml5.js"></script>';
+  const externalRuntimeScriptPattern = /<script\b[^>]*\bsrc\s*=\s*["'][^"']*(?:p5(?:\.min)?\.js|ml5(?:\.min)?\.js)[^"']*["'][^>]*>\s*<\/script>\s*/gi;
+  const injectRuntimeLibraries = (html: string): string => {
+    // Templates returned by an agent may retain an older ml5 build. Loading two
+    // builds registers TensorFlow backends twice and leaves the trackers unstable.
+    const withoutRuntimeDuplicates = html.replace(externalRuntimeScriptPattern, '');
+    const runtimeTags = options.includeMl5 === false ? p5ScriptTag : `${p5ScriptTag}\n  ${ml5ScriptTag}`;
+
+    if (withoutRuntimeDuplicates.includes('</head>')) {
+      return withoutRuntimeDuplicates.replace('</head>', `  ${runtimeTags}\n</head>`);
     }
 
-    if (html.includes(ml5ScriptTag)) {
-      return html;
-    }
-
-    if (html.includes('</head>')) {
-      return html.replace('</head>', `  ${ml5ScriptTag}\n</head>`);
-    }
-
-    return `${ml5ScriptTag}\n${html}`;
+    return `${runtimeTags}\n${withoutRuntimeDuplicates}`;
   };
   const runtimeScript = `<script>
     const sketch = document.getElementById('p5-source')?.textContent || '';
@@ -357,19 +356,6 @@ export function buildHtmlFromTemplate(
       }
     });
 
-    const needsWebcamBootstrap =
-      /facemesh|bodypose|handpose/.test(sketchLower) && !/createcapture\s*\(/.test(sketchLower);
-
-    if (needsWebcamBootstrap) {
-      try {
-        const bootstrapVideo = createCapture(VIDEO);
-        bootstrapVideo.hide();
-        window.__P5_BOOTSTRAP_VIDEO__ = bootstrapVideo;
-      } catch (error) {
-        reportError(error && error.message ? error.message : String(error));
-      }
-    }
-
     try {
       window.eval(sketch);
       window.parent?.postMessage({ type: 'p5-ready' }, '*');
@@ -377,7 +363,7 @@ export function buildHtmlFromTemplate(
       reportError(error && error.message ? error.message : String(error));
     }
   </script>`;
-  return injectMl5Script(template)
+  return injectRuntimeLibraries(template)
     .replaceAll('{{ASSET_SCRIPT_TAG}}', `<script>${assetScript.trim()}</script>`)
     .replaceAll('{{ASSET_SCRIPT}}', assetScript.trim())
     .replaceAll('{{SKETCH_SOURCE}}', options.sketchSource)
