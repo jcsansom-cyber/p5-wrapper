@@ -2,7 +2,6 @@
 .next/
 .env*.local
 .env.*
-!.env.example
 .DS_Store
 *.pem
 debug.json

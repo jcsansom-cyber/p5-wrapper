@@ -114,7 +114,7 @@ export default function SettingsModal({
               value={config.anthropicKey}
               onChange={e => onConfigChange({ ...config, anthropicKey: e.target.value })}
             />
-            <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>Stored only in this browser session. A server key can also be configured.</p>
+            <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>Stored only in your browser session.</p>
           </div>
 
           <div>
@@ -156,7 +156,7 @@ export default function SettingsModal({
               value={config.openaiKey}
               onChange={e => onConfigChange({ ...config, openaiKey: e.target.value })}
             />
-            <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>Stored only in this browser session. A server key can also be configured.</p>
+            <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>Stored only in your browser session.</p>
           </div>
 
           <div>
@@ -208,10 +208,10 @@ export default function SettingsModal({
                 borderRadius: 6,
               }}
             >
-            <p style={{ fontSize: 12, color: 'var(--accent-green)', fontWeight: 500 }}>🔒 Key privacy</p>
+            <p style={{ fontSize: 12, color: 'var(--accent-green)', fontWeight: 500 }}>🔒 Privacy First</p>
             <p style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-              Keys you enter are kept in sessionStorage and sent only when generating. Server environment keys are an
-              optional fallback. Sketches run on an isolated origin and cannot access app browser storage.
+              API keys stay in browser session storage. Generated sketches and chat history can be saved locally in your
+              browser, but nothing is written to the backend.
             </p>
           </div>
         </div>

@@ -125,14 +125,14 @@ export default function ChatPanel({
           {hasApiKey ? (
             <span className="badge badge-green">Connected</span>
           ) : (
-            <span className="badge badge-orange" title="Add an API key in Settings or configure it on the server">
+            <span className="badge badge-orange" title="Add your API key in settings">
               No API key
             </span>
           )}
         </div>
         {!hasApiKey && (
           <p style={{ fontSize: 11, color: 'var(--accent-orange)' }}>
-            Add this provider's API key in Settings, or configure it as a server environment variable.
+            Add a Claude or GPT key in Settings to start generating code.
           </p>
         )}
       </div>

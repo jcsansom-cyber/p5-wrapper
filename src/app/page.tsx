@@ -175,7 +175,6 @@ async function buildApiMessages(
 
 export default function Home() {
   const [config, setConfig] = useState<AppConfig>(DEFAULT_CONFIG);
-  const [configuredProviders, setConfiguredProviders] = useState<Record<Provider, boolean>>({ anthropic: false, openai: false });
   const [activeProvider, setActiveProvider] = useState<Provider>('anthropic');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [currentCode, setCurrentCode] = useState(DEFAULT_SKETCH);
@@ -324,22 +323,6 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    fetch('/api/config')
-      .then(response => (response.ok ? response.json() : null))
-      .then(data => {
-        if (data?.providers) {
-          setConfiguredProviders({
-            anthropic: Boolean(data.providers.anthropic),
-            openai: Boolean(data.providers.openai),
-          });
-        }
-      })
-      .catch(() => {
-        // Keep providers unavailable if the server configuration cannot be checked.
-      });
-  }, []);
-
-  useEffect(() => {
     if (!hydrated) return;
     sessionStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(config));
   }, [config, hydrated]);
@@ -376,14 +359,14 @@ export default function Home() {
   }, [savedSketches, hydrated]);
 
   const providerKey = activeProvider === 'anthropic' ? config.anthropicKey.trim() : config.openaiKey.trim();
-  const hasApiKey = Boolean(providerKey) || configuredProviders[activeProvider];
+  const hasApiKey = Boolean(providerKey);
   const anthropicModel = normalizeAnthropicModel(config.anthropicModel);
   const openaiModel = config.openaiModel.trim() || DEFAULT_CONFIG.openaiModel;
   const effectiveIncludeMl5 = true;
 
   const sendMessage = useCallback(
     async (content: string) => {
-      if (!(providerKey || configuredProviders[activeProvider]) || isLoading) return;
+      if (!providerKey || isLoading) return;
 
       const userMsg: ChatMessage = {
         id: crypto.randomUUID(),
@@ -407,7 +390,7 @@ export default function Home() {
           },
           body: JSON.stringify({
             provider: activeProvider,
-            apiKey: providerKey || undefined,
+            apiKey: providerKey,
             model: activeProvider === 'anthropic' ? anthropicModel : openaiModel,
             messages: apiMessages,
             systemPrompt,
@@ -466,7 +449,7 @@ export default function Home() {
         setIsLoading(false);
       }
     },
-    [providerKey, configuredProviders, isLoading, messages, activeProvider, config.systemPrompt, anthropicModel, openaiModel, currentCode, assets]
+    [providerKey, isLoading, messages, activeProvider, config.systemPrompt, anthropicModel, openaiModel, currentCode, assets]
   );
 
   const handleCodeChange = useCallback((newCode: string) => {

@@ -3,8 +3,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { buildHtmlFromTemplate, type UploadedAsset } from '../lib/types';
 
-const PREVIEW_ORIGIN = process.env.NEXT_PUBLIC_PREVIEW_ORIGIN?.replace(/\/$/, '');
-
 interface PreviewPanelProps {
   code: string;
   assets: UploadedAsset[];
@@ -22,10 +20,7 @@ function buildPreviewHtml(sketchCode: string, assets: UploadedAsset[], htmlTempl
 
 export default function PreviewPanel({ code, assets, htmlTemplate, onError }: PreviewPanelProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const previewTokenRef = useRef(typeof crypto === 'undefined' ? '' : crypto.randomUUID());
   const [frameLoaded, setFrameLoaded] = useState(false);
-  const [runnerReady, setRunnerReady] = useState(false);
-  const [parentOrigin, setParentOrigin] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [consoleEntries, setConsoleEntries] = useState<string[]>([]);
 
@@ -38,10 +33,6 @@ export default function PreviewPanel({ code, assets, htmlTemplate, onError }: Pr
   }, [code, assets, htmlTemplate]);
 
   useEffect(() => {
-    setParentOrigin(window.location.origin);
-  }, []);
-
-  useEffect(() => {
     if (!code) {
       onError(null);
     }
@@ -49,14 +40,6 @@ export default function PreviewPanel({ code, assets, htmlTemplate, onError }: Pr
 
   useEffect(() => {
     function handleMessage(event: MessageEvent) {
-      if (!PREVIEW_ORIGIN || event.origin !== PREVIEW_ORIGIN || event.source !== iframeRef.current?.contentWindow) return;
-      if (event.data?.token !== previewTokenRef.current) return;
-
-      if (event.data?.type === 'p5-runner-ready') {
-        setRunnerReady(true);
-        return;
-      }
-
       if (event.data?.type === 'p5-error') {
         onError(`p5.js error: ${event.data.message || 'Unknown error'}`);
       }
@@ -98,18 +81,6 @@ export default function PreviewPanel({ code, assets, htmlTemplate, onError }: Pr
     setConsoleEntries([]);
   }, [previewHtml]);
 
-  useEffect(() => {
-    if (!PREVIEW_ORIGIN || !runnerReady || !previewHtml) return;
-    iframeRef.current?.contentWindow?.postMessage(
-      { type: 'p5-preview-html', token: previewTokenRef.current, html: previewHtml },
-      PREVIEW_ORIGIN
-    );
-  }, [previewHtml, runnerReady]);
-
-  const runnerUrl = PREVIEW_ORIGIN && parentOrigin
-    ? `${PREVIEW_ORIGIN}/preview-runner.html?parentOrigin=${encodeURIComponent(parentOrigin)}&token=${encodeURIComponent(previewTokenRef.current)}`
-    : '';
-
   const sketchStyle = isFullscreen
     ? { position: 'fixed' as const, inset: 0, zIndex: 9999, border: 'none', width: '100%', height: '100%' }
     : { flex: 1, border: 'none', width: '100%', height: '100%' };
@@ -144,15 +115,11 @@ export default function PreviewPanel({ code, assets, htmlTemplate, onError }: Pr
       </div>
 
       <div style={{ flex: 1, overflow: 'hidden', background: '#ffffff' }}>
-        {!PREVIEW_ORIGIN ? (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', padding: 24, color: 'var(--text-secondary)', fontSize: 13, textAlign: 'center' }}>
-            Configure NEXT_PUBLIC_PREVIEW_ORIGIN to a different HTTPS origin before running sketches.
-          </div>
-        ) : code && runnerUrl ? (
+        {code ? (
           <iframe
             ref={iframeRef}
             title="p5.js Preview"
-            src={runnerUrl}
+            srcDoc={previewHtml}
             onLoad={() => {
               setFrameLoaded(true);
             }}
