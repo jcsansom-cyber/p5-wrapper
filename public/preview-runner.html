@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>p5 Preview Runner</title>
+  <style>
+    html, body, iframe { width: 100%; height: 100%; margin: 0; border: 0; overflow: hidden; }
+  </style>
+</head>
+<body>
+  <iframe id="sketch" title="Isolated p5 sketch" allow="camera *; microphone *; autoplay *; fullscreen *"></iframe>
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const parentOrigin = params.get('parentOrigin');
+    const token = params.get('token');
+    const sketchFrame = document.getElementById('sketch');
+
+    if (!parentOrigin || !token) {
+      document.body.textContent = 'Preview runner is missing its security configuration.';
+    } else {
+      window.addEventListener('message', event => {
+        if (event.origin !== parentOrigin || event.source !== window.parent) return;
+        const payload = event.data;
+        if (payload?.type !== 'p5-preview-html' || payload.token !== token || typeof payload.html !== 'string') return;
+        sketchFrame.srcdoc = payload.html;
+      });
+
+      window.addEventListener('message', event => {
+        if (event.source !== sketchFrame.contentWindow || typeof event.data?.type !== 'string') return;
+        window.parent.postMessage({ ...event.data, token }, parentOrigin);
+      });
+
+      window.parent.postMessage({ type: 'p5-runner-ready', token }, parentOrigin);
+    }
+  </script>
+</body>
+</html>

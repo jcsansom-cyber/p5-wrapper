@@ -49,7 +49,7 @@ const MIN_CODE_WIDTH = 320;
 const DEFAULT_CHAT_WIDTH = 360;
 const DEFAULT_CODE_WIDTH = 520;
 const RESIZE_GRIP_WIDTH = 8;
-const MAX_NON_IMAGE_UPLOAD_BYTES = 25 * 1024 * 1024;
+const MAX_NON_IMAGE_UPLOAD_BYTES = 100 * 1024 * 1024;
 
 function composeSystemPrompt(basePrompt: string, includeMl5: boolean, sketchContext: string, assetContext: string): string {
   const trimmedBase = basePrompt.trim() || DEFAULT_CONFIG.systemPrompt;
@@ -175,6 +175,7 @@ async function buildApiMessages(
 
 export default function Home() {
   const [config, setConfig] = useState<AppConfig>(DEFAULT_CONFIG);
+  const [configuredProviders, setConfiguredProviders] = useState<Record<Provider, boolean>>({ anthropic: false, openai: false });
   const [activeProvider, setActiveProvider] = useState<Provider>('anthropic');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [currentCode, setCurrentCode] = useState(DEFAULT_SKETCH);
@@ -253,11 +254,11 @@ export default function Home() {
     if (savedConfig) {
       try {
         const parsed = JSON.parse(savedConfig) as Partial<AppConfig>;
-        setConfig(prev => ({
-          ...prev,
-          ...parsed,
+        setConfig({
           anthropicModel: normalizeAnthropicModel(parsed.anthropicModel),
-        }));
+          openaiModel: typeof parsed.openaiModel === 'string' ? parsed.openaiModel : DEFAULT_CONFIG.openaiModel,
+          systemPrompt: typeof parsed.systemPrompt === 'string' ? parsed.systemPrompt : DEFAULT_CONFIG.systemPrompt,
+        });
       } catch {
         // Ignore malformed session data.
       }
@@ -321,6 +322,22 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    fetch('/api/config')
+      .then(response => (response.ok ? response.json() : null))
+      .then(data => {
+        if (data?.providers) {
+          setConfiguredProviders({
+            anthropic: Boolean(data.providers.anthropic),
+            openai: Boolean(data.providers.openai),
+          });
+        }
+      })
+      .catch(() => {
+        // Keep providers unavailable if the server configuration cannot be checked.
+      });
+  }, []);
+
+  useEffect(() => {
     if (!hydrated) return;
     sessionStorage.setItem(CONFIG_STORAGE_KEY, JSON.stringify(config));
   }, [config, hydrated]);
@@ -356,15 +373,14 @@ export default function Home() {
     saveSketches(savedSketches);
   }, [savedSketches, hydrated]);
 
-  const providerKey = activeProvider === 'anthropic' ? config.anthropicKey.trim() : config.openaiKey.trim();
-  const hasApiKey = Boolean(providerKey);
+  const hasApiKey = configuredProviders[activeProvider];
   const anthropicModel = normalizeAnthropicModel(config.anthropicModel);
   const openaiModel = config.openaiModel.trim() || DEFAULT_CONFIG.openaiModel;
   const effectiveIncludeMl5 = true;
 
   const sendMessage = useCallback(
     async (content: string) => {
-      if (!providerKey || isLoading) return;
+      if (!configuredProviders[activeProvider] || isLoading) return;
 
       const userMsg: ChatMessage = {
         id: crypto.randomUUID(),
@@ -388,7 +404,6 @@ export default function Home() {
           },
           body: JSON.stringify({
             provider: activeProvider,
-            apiKey: providerKey,
             model: activeProvider === 'anthropic' ? anthropicModel : openaiModel,
             messages: apiMessages,
             systemPrompt,
@@ -447,7 +462,7 @@ export default function Home() {
         setIsLoading(false);
       }
     },
-    [providerKey, isLoading, messages, activeProvider, config.systemPrompt, anthropicModel, openaiModel, currentCode, assets]
+    [configuredProviders, isLoading, messages, activeProvider, config.systemPrompt, anthropicModel, openaiModel, currentCode, assets]
   );
 
   const handleCodeChange = useCallback((newCode: string) => {
@@ -510,7 +525,7 @@ export default function Home() {
         }
 
         if ((file.type.startsWith('audio/') || file.type.startsWith('video/')) && file.size > MAX_NON_IMAGE_UPLOAD_BYTES) {
-          reject(new Error(`${file.name} is too large. Audio and video uploads must be 25 MB or smaller.`));
+          reject(new Error(`${file.name} is too large. Audio and video uploads must be 100 MB or smaller.`));
           return;
         }
 

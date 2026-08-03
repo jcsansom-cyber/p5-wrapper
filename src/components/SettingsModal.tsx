@@ -105,20 +105,6 @@ export default function SettingsModal({
 
           <div>
             <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 6 }}>
-              Claude API Key (Anthropic)
-            </label>
-            <input
-              type="password"
-              className="input"
-              placeholder="sk-ant-..."
-              value={config.anthropicKey}
-              onChange={e => onConfigChange({ ...config, anthropicKey: e.target.value })}
-            />
-            <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>Stored only in your browser session.</p>
-          </div>
-
-          <div>
-            <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 6 }}>
               Claude Model ID
             </label>
             <input
@@ -143,20 +129,6 @@ export default function SettingsModal({
             <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
               Claude Opus 5 is the new default, and you can still paste a custom Claude model ID if needed.
             </p>
-          </div>
-
-          <div>
-            <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: 'var(--text-secondary)', marginBottom: 6 }}>
-              GPT API Key (OpenAI)
-            </label>
-            <input
-              type="password"
-              className="input"
-              placeholder="sk-proj-..."
-              value={config.openaiKey}
-              onChange={e => onConfigChange({ ...config, openaiKey: e.target.value })}
-            />
-            <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>Stored only in your browser session.</p>
           </div>
 
           <div>
@@ -208,10 +180,10 @@ export default function SettingsModal({
                 borderRadius: 6,
               }}
             >
-            <p style={{ fontSize: 12, color: 'var(--accent-green)', fontWeight: 500 }}>🔒 Privacy First</p>
+            <p style={{ fontSize: 12, color: 'var(--accent-green)', fontWeight: 500 }}>🔒 Server-managed keys</p>
             <p style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-              API keys stay in browser session storage. Generated sketches and chat history can be saved locally in your
-              browser, but nothing is written to the backend.
+              Set ANTHROPIC_API_KEY and/or OPENAI_API_KEY in the deployment environment. API keys are never stored in or
+              sent from the browser. Generated sketches and chat history remain local to the browser.
             </p>
           </div>
         </div>

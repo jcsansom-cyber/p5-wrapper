@@ -1,8 +1,6 @@
 export type Provider = 'anthropic' | 'openai';
 
 export interface AppConfig {
-  anthropicKey: string;
-  openaiKey: string;
   anthropicModel: string;
   openaiModel: string;
   systemPrompt: string;
@@ -37,7 +35,6 @@ export type ProviderMessageContent = string | PromptContentPart[];
 
 export interface GenerateRequestBody {
   provider: Provider;
-  apiKey: string;
   model: string;
   messages: ProviderMessage[];
   systemPrompt: string;
@@ -125,8 +122,6 @@ Rules:
 `;
 
 export const DEFAULT_CONFIG: AppConfig = {
-  anthropicKey: '',
-  openaiKey: '',
   anthropicModel: 'claude-opus-5',
   openaiModel: 'gpt-5.6-terra',
   systemPrompt: DEFAULT_SYSTEM_PROMPT,
