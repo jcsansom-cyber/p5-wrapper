@@ -5,6 +5,7 @@ export async function POST(req: Request) {
   try {
     const body = (await req.json()) as Partial<GenerateRequestBody>;
     const provider = body.provider;
+    const browserApiKey = body.apiKey?.trim();
     const model = body.model?.trim();
     const messages = body.messages;
     const systemPrompt = body.systemPrompt?.trim();
@@ -14,7 +15,7 @@ export async function POST(req: Request) {
       return Response.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    const apiKey = provider === 'anthropic' ? process.env.ANTHROPIC_API_KEY : process.env.OPENAI_API_KEY;
+    const apiKey = browserApiKey || (provider === 'anthropic' ? process.env.ANTHROPIC_API_KEY : process.env.OPENAI_API_KEY);
     if (!apiKey) {
       return Response.json({ error: `The ${provider === 'anthropic' ? 'Anthropic' : 'OpenAI'} API key is not configured on this server.` }, { status: 503 });
     }

@@ -9,7 +9,7 @@ An AI wrapper for p5.js and ml5.js. Users can generate sketches with Claude or O
 - Inline code editing
 - Downloadable standalone HTML sketches
 - Local sketch persistence in the browser
-- Server-managed API keys
+- Session-only browser API keys, with optional server-managed keys
 - Vercel deployment support
 
 ## Supported models
@@ -22,7 +22,7 @@ Model IDs are editable in the Settings panel in case your account uses a differe
 
 ## Privacy
 
-- API keys are stored only as server environment variables and never sent to the browser
+- API keys entered by a user are stored only in that browser session; server keys are optional deployment fallbacks
 - Generated sketches, chat history, and uploads are stored in the browser unless the user clears them
 - The backend does not persist requests, but prompts and up to two image thumbnails are sent to the selected AI provider
 - Sketches run in a separately hosted preview origin so generated code cannot read the app's browser storage

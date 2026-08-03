@@ -255,6 +255,8 @@ export default function Home() {
       try {
         const parsed = JSON.parse(savedConfig) as Partial<AppConfig>;
         setConfig({
+          anthropicKey: typeof parsed.anthropicKey === 'string' ? parsed.anthropicKey : '',
+          openaiKey: typeof parsed.openaiKey === 'string' ? parsed.openaiKey : '',
           anthropicModel: normalizeAnthropicModel(parsed.anthropicModel),
           openaiModel: typeof parsed.openaiModel === 'string' ? parsed.openaiModel : DEFAULT_CONFIG.openaiModel,
           systemPrompt: typeof parsed.systemPrompt === 'string' ? parsed.systemPrompt : DEFAULT_CONFIG.systemPrompt,
@@ -373,14 +375,15 @@ export default function Home() {
     saveSketches(savedSketches);
   }, [savedSketches, hydrated]);
 
-  const hasApiKey = configuredProviders[activeProvider];
+  const providerKey = activeProvider === 'anthropic' ? config.anthropicKey.trim() : config.openaiKey.trim();
+  const hasApiKey = Boolean(providerKey) || configuredProviders[activeProvider];
   const anthropicModel = normalizeAnthropicModel(config.anthropicModel);
   const openaiModel = config.openaiModel.trim() || DEFAULT_CONFIG.openaiModel;
   const effectiveIncludeMl5 = true;
 
   const sendMessage = useCallback(
     async (content: string) => {
-      if (!configuredProviders[activeProvider] || isLoading) return;
+      if (!(providerKey || configuredProviders[activeProvider]) || isLoading) return;
 
       const userMsg: ChatMessage = {
         id: crypto.randomUUID(),
@@ -404,6 +407,7 @@ export default function Home() {
           },
           body: JSON.stringify({
             provider: activeProvider,
+            apiKey: providerKey || undefined,
             model: activeProvider === 'anthropic' ? anthropicModel : openaiModel,
             messages: apiMessages,
             systemPrompt,
@@ -462,7 +466,7 @@ export default function Home() {
         setIsLoading(false);
       }
     },
-    [configuredProviders, isLoading, messages, activeProvider, config.systemPrompt, anthropicModel, openaiModel, currentCode, assets]
+    [providerKey, configuredProviders, isLoading, messages, activeProvider, config.systemPrompt, anthropicModel, openaiModel, currentCode, assets]
   );
 
   const handleCodeChange = useCallback((newCode: string) => {
