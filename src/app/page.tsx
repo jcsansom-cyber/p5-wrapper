@@ -85,6 +85,10 @@ function truncateText(value: string, maxLength: number): string {
   return `${trimmed.slice(0, maxLength).trimEnd()}\n\n[trimmed]`;
 }
 
+function isPreviousDefaultPrompt(prompt: string | undefined): boolean {
+  return Boolean(prompt?.includes('You are a helpful p5.js assistant.') && prompt.includes('You create complete, runnable sketches for the browser.'));
+}
+
 async function makeVisionThumbnail(dataUrl: string, mimeType: string): Promise<string> {
   const maxDimension = 384;
   const quality = 0.6;
@@ -258,7 +262,9 @@ export default function Home() {
           openaiKey: typeof parsed.openaiKey === 'string' ? parsed.openaiKey : '',
           anthropicModel: normalizeAnthropicModel(parsed.anthropicModel),
           openaiModel: typeof parsed.openaiModel === 'string' ? parsed.openaiModel : DEFAULT_CONFIG.openaiModel,
-          systemPrompt: typeof parsed.systemPrompt === 'string' ? parsed.systemPrompt : DEFAULT_CONFIG.systemPrompt,
+          systemPrompt: typeof parsed.systemPrompt === 'string' && !isPreviousDefaultPrompt(parsed.systemPrompt)
+            ? parsed.systemPrompt
+            : DEFAULT_CONFIG.systemPrompt,
         });
       } catch {
         // Ignore malformed session data.
