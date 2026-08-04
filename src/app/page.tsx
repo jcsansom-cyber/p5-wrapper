@@ -50,26 +50,19 @@ const DEFAULT_CHAT_WIDTH = 360;
 const DEFAULT_CODE_WIDTH = 520;
 const RESIZE_GRIP_WIDTH = 8;
 const MAX_NON_IMAGE_UPLOAD_BYTES = 100 * 1024 * 1024;
+const MAX_HISTORY_CHARS = 8_000;
+const MAX_HISTORY_MESSAGE_CHARS = 1_800;
+const MAX_SKETCH_CONTEXT_CHARS = 6_000;
 
-function composeSystemPrompt(basePrompt: string, includeMl5: boolean, sketchContext: string, assetContext: string): string {
+function composeSystemPrompt(basePrompt: string, includeMl5: boolean, assetContext: string): string {
   const trimmedBase = basePrompt.trim() || DEFAULT_CONFIG.systemPrompt;
   let prompt = trimmedBase;
 
   if (includeMl5) {
     prompt +=
       '\n\nThe workspace already loads one compatible p5.js and ml5.js pair. Return sketch JavaScript only; do not add CDN script tags.' +
-      '\nFor webcam models such as FaceMesh, BodyPose, and HandPose, use the exact p5 editor pattern: createCapture(VIDEO) in setup, hide the video element, and call detectStart(video, callback).' +
-      '\nFor FaceMesh, BodyPose, and HandPose, do not use older async constructors or custom model options that the p5 editor examples do not use.' +
-      '\nFor HandPose, use hands[0].keypoints[8] for the index-finger tip; do not invent fields such as index_finger_tip.' +
-      '\nFor image classification or Teachable Machine, choose the matching classifier API and keep the sketch logic separate from the HTML wrapper.' +
-      '\nIf the user uploaded an image, use the local uploaded asset via p5AssetURL("exact-file-name") and loadImage(...). Never replace an uploaded file with a remote image URL.' +
-      '\nDo not use the old ml5.faceApi API.' +
-      '\nIf the sketch needs the camera, remind the user it requires HTTPS or localhost.' +
-      '\nIf the sketch needs extra script tags, iframe permissions, or other wrapper changes, you may return a full HTML document in a fenced html code block so the app can apply it.';
-  }
-
-  if (sketchContext.trim()) {
-    prompt += `\n\nCurrent sketch context:\n\`\`\`javascript\n${sketchContext.trim()}\n\`\`\``;
+      '\nFor FaceMesh, BodyPose, and HandPose, create and hide createCapture(VIDEO) in setup, then use detectStart(video, callback); do not use async constructors or faceApi.' +
+      '\nFor HandPose, use hands[0].keypoints[8]. Use uploaded images with p5AssetURL("exact-file-name"), never remote replacements.';
   }
 
   if (assetContext.trim()) {
@@ -86,7 +79,10 @@ function truncateText(value: string, maxLength: number): string {
 }
 
 function isPreviousDefaultPrompt(prompt: string | undefined): boolean {
-  return Boolean(prompt?.includes('You are a helpful p5.js assistant.') && prompt.includes('You create complete, runnable sketches for the browser.'));
+  return Boolean(
+    prompt?.includes('You are a helpful p5.js assistant.') ||
+      (prompt?.includes('You are a collaborative creative-coding co-designer') && prompt.includes('Help users develop art pieces'))
+  );
 }
 
 async function makeVisionThumbnail(dataUrl: string, mimeType: string): Promise<string> {
@@ -120,19 +116,26 @@ async function buildApiMessages(
   nextMessage: string,
   assets: UploadedAsset[]
 ): Promise<ProviderMessage[]> {
-  const history: ProviderMessage[] = previousMessages
-    .slice(-4)
-    .filter(message => message.content.trim())
-    .map(message => ({
-      role: message.role,
-      content: truncateText(message.content, 2500),
-    }));
+  const history: ProviderMessage[] = [];
+  let remainingHistoryChars = MAX_HISTORY_CHARS;
+
+  // Keep the most recent context first, dropping old turns once the request is full.
+  for (let index = previousMessages.length - 1; index >= 0 && remainingHistoryChars > 0; index -= 1) {
+    const message = previousMessages[index];
+    if (!message.content.trim()) continue;
+
+    const content = truncateText(message.content, Math.min(MAX_HISTORY_MESSAGE_CHARS, remainingHistoryChars));
+    if (!content) continue;
+
+    history.unshift({ role: message.role, content });
+    remainingHistoryChars -= content.length;
+  }
 
   const sketchContext = currentCode.trim()
     ? [
         {
           role: 'user' as const,
-          content: `Here is the current p5.js sketch:\n\n\`\`\`javascript\n${truncateText(currentCode.trim(), 12000)}\n\`\`\``,
+          content: `Here is the current p5.js sketch:\n\n\`\`\`javascript\n${truncateText(currentCode.trim(), MAX_SKETCH_CONTEXT_CHARS)}\n\`\`\``,
       },
     ]
     : [];
@@ -171,12 +174,12 @@ async function buildApiMessages(
           content: [
             {
               type: 'text',
-              text: truncateText([nextMessage, assetGuidanceText].filter(Boolean).join('\n\n'), 2500) || 'Please use the uploaded assets in the sketch.',
+              text: truncateText([nextMessage, assetGuidanceText].filter(Boolean).join('\n\n'), MAX_HISTORY_MESSAGE_CHARS) || 'Please use the uploaded assets in the sketch.',
             },
             ...imageParts,
           ],
         }
-      : { role: 'user', content: truncateText(nextMessage, 2000) || 'Please help create a p5.js sketch.' };
+      : { role: 'user', content: truncateText(nextMessage, MAX_HISTORY_MESSAGE_CHARS) || 'Please help create a p5.js sketch.' };
 
   return [...sketchContext, ...history, nextUserMessage];
 }
@@ -206,6 +209,8 @@ export default function Home() {
     startX: 0,
     startWidth: 0,
   });
+  const activeRequestRef = useRef<AbortController | null>(null);
+  const chatContextVersionRef = useRef(0);
 
   async function compressImageFile(file: File): Promise<string> {
     const maxDimension = 1280;
@@ -388,11 +393,17 @@ export default function Home() {
       const nextMessages = [...messages, userMsg];
       setMessages(nextMessages);
       setIsLoading(true);
+      const chatContextVersion = chatContextVersionRef.current;
+      let requestController: AbortController | null = null;
 
       try {
-        const systemPrompt = composeSystemPrompt(config.systemPrompt, effectiveIncludeMl5, currentCode, buildAssetContext(assets));
+        const systemPrompt = composeSystemPrompt(config.systemPrompt, effectiveIncludeMl5, buildAssetContext(assets));
         const apiMessages = await buildApiMessages(currentCode, messages, content, assets);
+        if (chatContextVersion !== chatContextVersionRef.current) return;
+
         const controller = new AbortController();
+        requestController = controller;
+        activeRequestRef.current = controller;
         const timeoutId = window.setTimeout(() => controller.abort(), 75_000);
         let response: Response;
 
@@ -408,7 +419,9 @@ export default function Home() {
               model: activeProvider === 'anthropic' ? anthropicModel : openaiModel,
               messages: apiMessages,
               systemPrompt,
-              maxTokens: 4096,
+              // GPT-5 counts reasoning and visible output against this limit.
+              // Give it enough headroom to return a complete sketch response.
+              maxTokens: activeProvider === 'openai' ? 8192 : 4096,
             }),
             signal: controller.signal,
           });
@@ -436,6 +449,7 @@ export default function Home() {
         }
 
         const data = (await response.json()) as { text?: string };
+        if (chatContextVersion !== chatContextVersionRef.current) return;
         const text = data.text ?? '';
         if (!text.trim()) {
           throw new Error('The model completed without visible text. Please try again.');
@@ -464,6 +478,7 @@ export default function Home() {
         };
         setMessages(prev => [...prev, assistantMsg]);
       } catch (error) {
+        if (chatContextVersionRef.current !== chatContextVersion) return;
         const errorMsg: ChatMessage = {
           id: crypto.randomUUID(),
           role: 'assistant',
@@ -472,6 +487,9 @@ export default function Home() {
         };
         setMessages(prev => [...prev, errorMsg]);
       } finally {
+        if (activeRequestRef.current === requestController) {
+          activeRequestRef.current = null;
+        }
         setIsLoading(false);
       }
     },
@@ -498,6 +516,9 @@ export default function Home() {
   }, [activeSketchId, savedSketches]);
 
   const clearChat = useCallback(() => {
+    chatContextVersionRef.current += 1;
+    activeRequestRef.current?.abort();
+    activeRequestRef.current = null;
     setMessages([]);
     setPreviewError(null);
   }, []);

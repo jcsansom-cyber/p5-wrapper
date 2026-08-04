@@ -16,6 +16,7 @@ interface OpenAIChatResponse {
 
 const DEFAULT_ANTHROPIC_FALLBACK_MODEL = 'claude-opus-5';
 const PROVIDER_TIMEOUT_MS = 60_000;
+const OPENAI_REASONING_EFFORT = 'low';
 
 async function fetchWithTimeout(url: string, options: RequestInit): Promise<Response> {
   const controller = new AbortController();
@@ -210,6 +211,7 @@ export async function callOpenAI(
   messages: ProviderMessage[],
   maxTokens = 4096
 ): Promise<{ text: string; usage?: { inputTokens: number; outputTokens: number } }> {
+  const isGpt5Model = model.toLowerCase().startsWith('gpt-5');
   const response = await fetchWithTimeout('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -227,6 +229,8 @@ export async function callOpenAI(
       ],
       // GPT-5-family Chat Completions models reject the legacy max_tokens field.
       max_completion_tokens: maxTokens,
+      // Reserve the larger completion budget for a visible p5.js response.
+      ...(isGpt5Model ? { reasoning_effort: OPENAI_REASONING_EFFORT } : {}),
     }),
   });
 
