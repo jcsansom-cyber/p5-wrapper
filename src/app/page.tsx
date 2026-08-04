@@ -121,11 +121,11 @@ async function buildApiMessages(
   assets: UploadedAsset[]
 ): Promise<ProviderMessage[]> {
   const history: ProviderMessage[] = previousMessages
-    .slice(-6)
+    .slice(-4)
     .filter(message => message.content.trim())
     .map(message => ({
       role: message.role,
-      content: truncateText(message.content, 4000),
+      content: truncateText(message.content, 2500),
     }));
 
   const sketchContext = currentCode.trim()
@@ -140,15 +140,19 @@ async function buildApiMessages(
   const imageAssets = assets
     .filter(asset => asset.type.startsWith('image/'))
     .sort((a, b) => b.addedAt - a.addedAt)
-    .slice(0, 2);
+    .slice(0, 1);
 
   const imageParts: PromptContentPart[] = [];
   for (const imageAsset of imageAssets) {
-    imageParts.push({
-      type: 'image' as const,
-      mediaType: imageAsset.type || 'image/png',
-      dataUrl: await makeVisionThumbnail(imageAsset.dataUrl, imageAsset.type || 'image/png'),
-    });
+    try {
+      imageParts.push({
+        type: 'image' as const,
+        mediaType: imageAsset.type || 'image/png',
+        dataUrl: await makeVisionThumbnail(imageAsset.dataUrl, imageAsset.type || 'image/png'),
+      });
+    } catch {
+      // A damaged or unsupported image should not prevent text-only generation.
+    }
   }
 
   const assetGuidanceText = assets.length
@@ -385,24 +389,37 @@ export default function Home() {
       setMessages(nextMessages);
       setIsLoading(true);
 
-      const systemPrompt = composeSystemPrompt(config.systemPrompt, effectiveIncludeMl5, currentCode, buildAssetContext(assets));
-      const apiMessages = await buildApiMessages(currentCode, messages, content, assets);
-
       try {
-        const response = await fetch('/api/generate', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            provider: activeProvider,
-            apiKey: providerKey,
-            model: activeProvider === 'anthropic' ? anthropicModel : openaiModel,
-            messages: apiMessages,
-            systemPrompt,
-            maxTokens: 4096,
-          }),
-        });
+        const systemPrompt = composeSystemPrompt(config.systemPrompt, effectiveIncludeMl5, currentCode, buildAssetContext(assets));
+        const apiMessages = await buildApiMessages(currentCode, messages, content, assets);
+        const controller = new AbortController();
+        const timeoutId = window.setTimeout(() => controller.abort(), 75_000);
+        let response: Response;
+
+        try {
+          response = await fetch('/api/generate', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              provider: activeProvider,
+              apiKey: providerKey,
+              model: activeProvider === 'anthropic' ? anthropicModel : openaiModel,
+              messages: apiMessages,
+              systemPrompt,
+              maxTokens: 4096,
+            }),
+            signal: controller.signal,
+          });
+        } catch (error) {
+          if (controller.signal.aborted) {
+            throw new Error('Generation timed out after 75 seconds. Please try again.');
+          }
+          throw error;
+        } finally {
+          window.clearTimeout(timeoutId);
+        }
 
         if (!response.ok) {
           const rawError = await response.text().catch(() => '');
@@ -420,6 +437,9 @@ export default function Home() {
 
         const data = (await response.json()) as { text?: string };
         const text = data.text ?? '';
+        if (!text.trim()) {
+          throw new Error('The model completed without visible text. Please try again.');
+        }
         const htmlTemplateCandidate = extractHtmlTemplate(text);
         const code = htmlTemplateCandidate
           ? extractFencedBlock(text, ['p5js', 'javascript', 'js']) || extractSketchFromImportedText(text)

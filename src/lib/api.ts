@@ -3,14 +3,35 @@ import type { PromptContentPart, ProviderMessage } from './types';
 interface AnthropicResponse {
   content?: Array<{ type?: string; text?: string }>;
   usage?: { input_tokens?: number; output_tokens?: number };
+  stop_reason?: string | null;
 }
 
 interface OpenAIChatResponse {
-  choices?: Array<{ message?: { content?: string } }>;
+  choices?: Array<{
+    message?: { content?: string | Array<{ type?: string; text?: string }> };
+    finish_reason?: string | null;
+  }>;
   usage?: { prompt_tokens?: number; completion_tokens?: number };
 }
 
 const DEFAULT_ANTHROPIC_FALLBACK_MODEL = 'claude-opus-5';
+const PROVIDER_TIMEOUT_MS = 60_000;
+
+async function fetchWithTimeout(url: string, options: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), PROVIDER_TIMEOUT_MS);
+
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } catch (error) {
+    if (controller.signal.aborted) {
+      throw new Error(`Provider request timed out after ${Math.round(PROVIDER_TIMEOUT_MS / 1000)} seconds.`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
 
 async function readErrorMessage(response: Response): Promise<string> {
   const rawText = await response.text().catch(() => '');
@@ -129,7 +150,7 @@ export async function callAnthropic(
   maxTokens = 4096
 ): Promise<{ text: string; usage?: { inputTokens: number; outputTokens: number } }> {
   async function run(selectedModel: string) {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const response = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -155,6 +176,11 @@ export async function callAnthropic(
       .map(block => block.text ?? '')
       .join('\n')
       .trim();
+
+    if (!text) {
+      const requestId = response.headers.get('request-id');
+      throw new Error(`The model returned no visible text${data.stop_reason ? ` (stop reason: ${data.stop_reason})` : ''}${requestId ? ` [request ID: ${requestId}]` : ''}.`);
+    }
 
     return {
       text,
@@ -184,7 +210,7 @@ export async function callOpenAI(
   messages: ProviderMessage[],
   maxTokens = 4096
 ): Promise<{ text: string; usage?: { inputTokens: number; outputTokens: number } }> {
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+  const response = await fetchWithTimeout('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -210,7 +236,16 @@ export async function callOpenAI(
   }
 
   const data: OpenAIChatResponse = await response.json();
-  const text = data.choices?.[0]?.message?.content?.trim() ?? '';
+  const choice = data.choices?.[0];
+  const content = choice?.message?.content;
+  const text = typeof content === 'string'
+    ? content.trim()
+    : (content ?? []).map(part => part.text ?? '').join('\n').trim();
+
+  if (!text) {
+    const requestId = response.headers.get('x-request-id') || response.headers.get('request-id');
+    throw new Error(`The model returned no visible text${choice?.finish_reason ? ` (finish reason: ${choice.finish_reason})` : ''}${requestId ? ` [request ID: ${requestId}]` : ''}.`);
+  }
 
   return {
     text,
