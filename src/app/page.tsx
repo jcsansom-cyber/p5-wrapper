@@ -421,7 +421,7 @@ export default function Home() {
               systemPrompt,
               // GPT-5 counts reasoning and visible output against this limit.
               // Give it enough headroom to return a complete sketch response.
-              maxTokens: activeProvider === 'openai' ? 8192 : 4096,
+              maxTokens: 8192,
             }),
             signal: controller.signal,
           });
